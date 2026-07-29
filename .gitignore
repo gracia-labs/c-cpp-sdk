@@ -1,0 +1,15 @@
+# Build output
+/build/
+/out/
+build/
+cmake-build-*/
+
+# CPM package cache
+/cpm_modules/
+
+# Editor / OS
+.DS_Store
+.vs/
+.vscode/
+*.user
+imgui.ini
