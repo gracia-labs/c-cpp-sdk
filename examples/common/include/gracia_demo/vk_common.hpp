@@ -69,13 +69,26 @@ class DeviceRequest {
   VkDeviceCreateInfo ci_{};
 };
 
+// Loads the Vulkan entry points through volk, which owns them for the whole
+// process: the SDK, Dear ImGui and GLFW all resolve through this one loader.
+// Safe to call more than once; the first call decides. Call it before anything
+// that touches Vulkan, including glfwInitVulkanLoader.
+bool initVulkanLoader();
+
 VkPipelineCache createPipelineCache(VkDevice device);
 VkImageView createColorView(VkDevice device, VkImage image, VkFormat format);
 
 // Color only. finalLayout is PRESENT_SRC_KHR for a window,
 // COLOR_ATTACHMENT_OPTIMAL for OpenXR.
+//
+// `viewMask` turns the subpass into a multiview one: 0b11 makes every draw run
+// twice and write layer 0 and layer 1 of an array attachment, which is stereo in
+// one pass. Give render() the stereo mode that matches
+// (GRACIA_STEREO_MODE_MULTIVIEW); the pass and the mode must describe the same
+// thing.
 VkRenderPass createColorRenderPass(VkDevice device, VkFormat format,
-                                   VkImageLayout finalLayout);
+                                   VkImageLayout finalLayout,
+                                   uint32_t viewMask = 0);
 
 // Makes the SDK's compute prep visible to the splat draws.
 void barrierComputeToGraphics(VkCommandBuffer cmd);

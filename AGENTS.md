@@ -76,9 +76,17 @@ in `SplatsPlayer::advance`. Fix a clock defect there, not in a viewer.
 18. Set `vr` to true in **both** places: `gracia_splats_renderer_create()` and `render()`. They are
     independent, and neither reports an error. With one of them false you get one view instead of
     two, both eyes show the left image, and the picture looks correct until you close one eye.
-19. Call `render()` **one time for each frame**, not one time for each eye. One call returns one draw
-    call for each eye. Two calls consume two of the three ring slots of the SDK, which wraps the ring
-    inside two frames and gives the flicker of rule 15.
+19. Call `render()` **one time for each frame**, not one time for each eye. Two calls consume two of
+    the three ring slots of the SDK, which wraps the ring inside two frames and gives the flicker of
+    rule 15. Multipass returns one draw call for each eye; multiview returns **one** draw call in
+    total, and that call writes both eyes.
+19a. The stereo mode of `render()` must match the render pass. The headset viewer uses
+    `GRACIA_STEREO_MODE_MULTIVIEW`, so its render pass declares a view mask of `0b11`
+    (`VkRenderPassMultiviewCreateInfo`), its swapchain has two array layers, and its image views are
+    `2D_ARRAY` over both layers. A framebuffer for a multiview pass declares `layers = 1`: the view
+    mask, not the framebuffer, says how many layers the pass writes. Read back
+    `DrawCalls::color.stereo` to confirm the mode the draw calls came back in; a silent fall back to
+    multipass puts both eyes on layer 0 and looks mono.
 20. Build a projection for each eye from `XrView::fov`. The field of view of a headset is asymmetric
     and differs between the eyes. A symmetric projection from the aspect ratio looks correct on a
     monitor and is wrong in a headset.
@@ -96,6 +104,19 @@ in `SplatsPlayer::advance`. Fix a clock defect there, not in a viewer.
     whose command buffer still runs, but not one that was only recorded.
 25. Call `xrBeginFrame` and `xrEndFrame` for every frame, also when `shouldRender` is false, and keep
     `setTime()` and `pump()` running on those frames (rule 8).
+26. Splats are trained in sRGB and the SDK writes values that are already encoded, so **the blend
+    happens in that encoded space** and every color decision follows from that. The 8-bit default
+    declares the swapchain sRGB (the compositor decodes on read) and renders through the UNORM twin
+    (so the write encodes nothing). `--fp16` asks for `RGBA16F` instead, which stops the blend
+    quantizing to 256 levels at every step, and pays for it with a decode: a float format has no
+    sRGB twin, and a runtime reads a float swapchain as linear.
+27. Decode **after** the blend, never inside the splat shader. Decoding is not linear, so
+    `sum(w[i] * decode(c[i]))` is not `decode(sum(w[i] * c[i]))`. A shader sees one splat and cannot
+    defer past the blend, so decoding there would move compositing into linear space — away from the
+    space the splats were trained in. The viewer decodes in a second subpass of the same render
+    pass, which reproduces exactly what the compositor does for the 8-bit path, with the blend
+    accumulated in float. Replay the draw calls in the **first** subpass of that pass. A later
+    subpass does not accept them.
 
 ## The transport UI
 

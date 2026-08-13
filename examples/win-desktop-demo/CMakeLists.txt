@@ -47,9 +47,11 @@ add_library(imgui STATIC
 target_include_directories(imgui PUBLIC
   "${imgui_SOURCE_DIR}" "${imgui_SOURCE_DIR}/backends")
 target_link_libraries(imgui PUBLIC glfw volk Vulkan::Headers)
-# The Vulkan backend resolves entry points through volk (no static prototypes).
-target_compile_definitions(imgui PUBLIC
-  VK_NO_PROTOTYPES IMGUI_IMPL_VULKAN_NO_PROTOTYPES)
+# The Vulkan backend shares our volk entry points instead of resolving its own.
+# USE_VOLK makes the backend include volk.h, which turns off its private loader
+# and its ImGui_ImplVulkan_LoadFunctions requirement. VK_NO_PROTOTYPES already
+# arrives from the volk target.
+target_compile_definitions(imgui PUBLIC IMGUI_IMPL_VULKAN_USE_VOLK)
 
 # --- The demo executable ------------------------------------------------------
 add_executable(win_desktop_demo

@@ -29,12 +29,41 @@ CPMAddPackage(
     "BUILD_CONFORMANCE_TESTS OFF"
 )
 
+# --- Shaders ------------------------------------------------------------------
+# The only shaders in the examples: the sRGB resolve for the --fp16 target.
+# glslc emits them as C array initializers (-mfmt=c), so they are #included into
+# the binary. No .spv files to find at runtime, and no asset path to get wrong.
+find_program(GLSLC_EXE NAMES glslc
+  HINTS "$ENV{VULKAN_SDK}/Bin" "$ENV{VULKAN_SDK}/bin")
+if(NOT GLSLC_EXE)
+  message(FATAL_ERROR
+    "glslc not found. Install the Vulkan SDK, or set VULKAN_SDK.")
+endif()
+
+set(SHADER_OUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/shaders")
+file(MAKE_DIRECTORY "${SHADER_OUT_DIR}")
+set(SHADER_HEADERS)
+foreach(shader srgb_resolve.vert srgb_resolve.frag)
+  set(src "${CMAKE_CURRENT_LIST_DIR}/shaders/${shader}")
+  set(dst "${SHADER_OUT_DIR}/${shader}.inc")
+  add_custom_command(
+    OUTPUT "${dst}"
+    COMMAND "${GLSLC_EXE}" -O -mfmt=c -o "${dst}" "${src}"
+    DEPENDS "${src}"
+    COMMENT "glslc ${shader}"
+    VERBATIM)
+  list(APPEND SHADER_HEADERS "${dst}")
+endforeach()
+
 # --- The demo executable ------------------------------------------------------
 add_executable(win_openxr_demo
   src/main.cpp
   src/xr_context.cpp
   src/xr_viewer.cpp
+  ${SHADER_HEADERS}
 )
+
+target_include_directories(win_openxr_demo PRIVATE "${SHADER_OUT_DIR}")
 
 target_link_libraries(win_openxr_demo PRIVATE
   gracia_demo_common

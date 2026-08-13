@@ -93,6 +93,13 @@ bool DeviceRequest::has(const char* name) const {
   return false;
 }
 
+bool initVulkanLoader() {
+  static const bool ok = volkInitialize() == VK_SUCCESS;
+  if (!ok)
+    std::fprintf(stderr, "Vulkan loader not found (install a Vulkan runtime)\n");
+  return ok;
+}
+
 VkPipelineCache createPipelineCache(VkDevice device) {
   VkPipelineCacheCreateInfo pci{VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO};
   VkPipelineCache cache = VK_NULL_HANDLE;
@@ -112,7 +119,8 @@ VkImageView createColorView(VkDevice device, VkImage image, VkFormat format) {
 }
 
 VkRenderPass createColorRenderPass(VkDevice device, VkFormat format,
-                                   VkImageLayout finalLayout) {
+                                   VkImageLayout finalLayout,
+                                   uint32_t viewMask) {
   VkAttachmentDescription color{};
   color.format = format;
   color.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -144,6 +152,17 @@ VkRenderPass createColorRenderPass(VkDevice device, VkFormat format,
   rp.pSubpasses = &subpass;
   rp.dependencyCount = 1;
   rp.pDependencies = &dep;
+
+  // The correlation mask tells the driver the views run together on one GPU,
+  // which is what lets it merge them instead of scheduling two passes.
+  VkRenderPassMultiviewCreateInfo mv{
+      VK_STRUCTURE_TYPE_RENDER_PASS_MULTIVIEW_CREATE_INFO};
+  mv.subpassCount = 1;
+  mv.pViewMasks = &viewMask;
+  mv.correlationMaskCount = 1;
+  mv.pCorrelationMasks = &viewMask;
+  if (viewMask) rp.pNext = &mv;
+
   VkRenderPass pass = VK_NULL_HANDLE;
   VK_CHECK(vkCreateRenderPass(device, &rp, nullptr, &pass));
   return pass;

@@ -22,10 +22,11 @@ class XrViewer {
   SplatsPlayer& player() { return player_; }
 
   // Per frame: advance the clock, then prepare (one SDK call for both eyes)
-  // before the render passes, then record for each eye.
+  // before the render pass, then record once. Multiview means one draw call
+  // fills both layers, so there is no per-eye step on either side.
   void advance(float dt);
   void prepare(const XrFrameCtx& f);
-  void record(uint32_t slot, uint32_t eye, VkCommandBuffer cmd);
+  void record(uint32_t slot, VkCommandBuffer cmd);
 
   // Places the scene in front of the reference-space origin, and remembers the
   // numbers so advance() can place it again once late metadata gives the

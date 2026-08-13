@@ -92,29 +92,34 @@ void XrViewer::prepare(const XrFrameCtx& f) {
   draws = renderer_.render(
       objs, projections, viewTransforms, glm::value_ptr(loco), f.eyeExtent.width,
       f.eyeExtent.height, true,
-      makeSplatsPass(color_, GRACIA_STEREO_MODE_MULTIPASS),
+      makeSplatsPass(color_, GRACIA_STEREO_MODE_MULTIVIEW),
       /*motionPass=*/nullptr, /*meshPass=*/nullptr, gcb);
 
   player_.setBuffering(draws.buffering);
 
-  // One view back means stereo is off: a stable mono picture, and no error.
+  // Multiview gives back one draw call, not one for each eye: the view mask on
+  // the render pass makes that single call run once per layer. A fallback to
+  // multipass would put both eyes on layer 0, which reads as a mono picture.
   if (!checkedStereo_ && !draws.color.views.empty()) {
     checkedStereo_ = true;
-    if (draws.color.views.size() < XrContext::kEyes)
+    if (draws.color.stereo != GRACIA_STEREO_MODE_MULTIVIEW)
       std::fprintf(stderr,
-                   "WARNING: the SDK returned %zu view(s), not 2. Stereo is off; "
-                   "check the vr flag on both create() and render().\n",
-                   draws.color.views.size());
+                   "WARNING: the SDK recorded stereo mode %d, not multiview (%d). "
+                   "Both eyes will show the same image; check the vr flag on "
+                   "both create() and render().\n",
+                   (int)draws.color.stereo.value_or(GRACIA_STEREO_MODE_MULTIPASS),
+                   (int)GRACIA_STEREO_MODE_MULTIVIEW);
   }
 }
 
-void XrViewer::record(uint32_t slot, uint32_t eye, VkCommandBuffer cmd) {
+void XrViewer::record(uint32_t slot, VkCommandBuffer cmd) {
   auto& draws = frames_[slot];
   // Draw while buffering too: the SDK holds the last decoded frame.
-  if (eye >= draws.color.views.size() || !draws.color.views[eye].has_value()) return;
+  if (draws.color.views.empty() || !draws.color.views[0].has_value()) return;
 
   GraciaRenderPass rp{};
   rp.commandBuffer = cmd;
   rp.renderPass = pass_;
-  draws.color.views[eye]->execute(rp);
+  // One call fills both layers: the render pass carries the view mask.
+  draws.color.views[0]->execute(rp);
 }

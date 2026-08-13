@@ -43,6 +43,7 @@ struct Options {
   float scale = 0.75f;     // target scene radius, metres
   float distance = 2.0f;   // in front of the origin, metres
   float height = 0.0f;     // above the origin, metres
+  bool fp16 = false;       // RGBA16F swapchain instead of 8-bit sRGB
 };
 
 Options parseArgs(int argc, char** argv) {
@@ -55,6 +56,7 @@ Options parseArgs(int argc, char** argv) {
     else if (a == "--scale" && i + 1 < argc) o.scale = (float)atof(argv[++i]);
     else if (a == "--distance" && i + 1 < argc) o.distance = (float)atof(argv[++i]);
     else if (a == "--height" && i + 1 < argc) o.height = (float)atof(argv[++i]);
+    else if (a == "--fp16") o.fp16 = true;
     else if (!a.empty() && a[0] != '-') o.scenes.emplace_back(a);
   }
   return o;
@@ -64,7 +66,8 @@ void usage() {
   std::printf(
       "usage: win_openxr_demo <scene.ply|.sog|.guf|.mint> [more scenes ...]\n"
       "       [--stream <url>] [--token <t>] [--seek <s>]\n"
-      "       [--scale <m>] [--distance <m>] [--height <m>]\n");
+      "       [--scale <m>] [--distance <m>] [--height <m>]\n"
+      "       [--fp16]   RGBA16F target instead of 8-bit sRGB (brighter)\n");
 }
 
 }  // namespace
@@ -81,7 +84,7 @@ int main(int argc, char** argv) {
   }
 
   XrContext xr;
-  if (!xr.init("Gracia OpenXR Viewer")) return 1;
+  if (!xr.init("Gracia OpenXR Viewer", opts.fp16)) return 1;
   std::printf("OpenXR runtime: %s\n", xr.runtimeName().c_str());
 
   XrViewer viewer;
@@ -123,8 +126,8 @@ int main(int argc, char** argv) {
     std::optional<XrFrameCtx> f = xr.acquire(fs);
     if (f) {
       viewer.prepare(*f);
-      xr.render(*f, [&](VkCommandBuffer cmd, uint32_t eye) {
-        viewer.record(f->slot, eye, cmd);
+      xr.render(*f, [&](VkCommandBuffer cmd) {
+        viewer.record(f->slot, cmd);
       });
     }
     xr.endFrame(fs, f);

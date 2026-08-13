@@ -36,19 +36,24 @@ struct XrFrameCtx {
   VkCommandBuffer cmd = VK_NULL_HANDLE;
   uint32_t slot = 0;
   std::array<XrView, 2> views{};  // 0 = left, 1 = right (spec order)
-  uint32_t acquiredCount = 0;
+  bool acquired = false;
   VkExtent2D eyeExtent{};  // per eye, not the combined width
 };
 
 // OpenXR session plus the Vulkan device it chose, and a color-only render pass
-// the splats replay into. One swapchain per eye (multipass stereo).
+// the splats replay into. One swapchain of two array layers, filled by one
+// multiview pass, into a 16-bit float target.
 class XrContext {
  public:
   // Two, not three: xrWaitFrame paces us, so a third only adds latency.
   static constexpr uint32_t kFramesInFlight = 2;
   static constexpr uint32_t kEyes = 2;
+  // One bit for each eye. The render pass, the stereo mode given to render() and
+  // the layer count of the swapchain all have to agree with this.
+  static constexpr uint32_t kViewMask = 0b11;
 
-  bool init(const char* appName);
+  // `float16` asks for an RGBA16F swapchain instead of the 8-bit sRGB one.
+  bool init(const char* appName, bool float16 = false);
   void shutdown();
 
   gvk::Gpu gpu() const {
@@ -73,9 +78,8 @@ class XrContext {
   // Nullopt when there is nothing to draw; endFrame still runs.
   std::optional<XrFrameCtx> acquire(const XrFrameState& fs);
 
-  // Runs body in a cleared render pass for each eye, barrier once up front.
-  void render(XrFrameCtx& f,
-              const std::function<void(VkCommandBuffer, uint32_t eye)>& body);
+  // Runs body once, in a cleared multiview pass that covers both eyes.
+  void render(XrFrameCtx& f, const std::function<void(VkCommandBuffer)>& body);
 
   void endFrame(const XrFrameState& fs, std::optional<XrFrameCtx>& f);
 
@@ -85,8 +89,13 @@ class XrContext {
   bool getSystem();
   bool createVulkan();
   bool createSession();
-  bool createSwapchains();
+  bool createSwapchains(bool wantFloat16);
   void createFramebuffers();
+  // --fp16 only. Two subpasses: the splats into a float intermediate, then the
+  // sRGB decode from it into the swapchain.
+  VkRenderPass createResolveRenderPass();
+  // The intermediate image, its descriptor, and the subpass-1 pipeline.
+  bool createResolve();
 
   XrInstance instance_ = XR_NULL_HANDLE;
   XrSystemId systemId_ = XR_NULL_SYSTEM_ID;
@@ -106,13 +115,11 @@ class XrContext {
   PFN_xrGetVulkanGraphicsDevice2KHR pfnGetVkDevice_ = nullptr;
   PFN_xrCreateVulkanDeviceKHR pfnCreateVkDevice_ = nullptr;
 
-  struct Eye {
-    XrSwapchain swapchain = XR_NULL_HANDLE;
-    std::vector<XrSwapchainImageVulkan2KHR> images;  // the runtime owns the VkImages
-    std::vector<VkImageView> views;
-    std::vector<VkFramebuffer> framebuffers;
-  };
-  std::array<Eye, kEyes> eyes_{};
+  // One swapchain, two array layers: layer 0 is the left eye, layer 1 the right.
+  XrSwapchain swapchain_ = XR_NULL_HANDLE;
+  std::vector<XrSwapchainImageVulkan2KHR> images_;  // the runtime owns the VkImages
+  std::vector<VkImageView> views_;                  // 2D_ARRAY, both layers
+  std::vector<VkFramebuffer> framebuffers_;
   std::array<XrViewConfigurationView, kEyes> cfgViews_{};
   std::array<XrCompositionLayerProjectionView, kEyes> projViews_{};
   VkExtent2D eyeExtent_{};
@@ -130,6 +137,20 @@ class XrContext {
   VkFormat viewFormat_ = VK_FORMAT_UNDEFINED;
   GraciaColorFormat graciaColorFormat_ = GRACIA_COLOR_FORMAT_RGBA8_UNORM;
   VkRenderPass renderPass_ = VK_NULL_HANDLE;
+
+  // --fp16: the splats land in this image in subpass 0, and subpass 1 decodes it
+  // from sRGB into the linear float swapchain. One image for every frame: the
+  // render pass has an external dependency that waits for the previous frame to
+  // finish reading it.
+  bool fp16_ = false;
+  VkImage resolveImage_ = VK_NULL_HANDLE;
+  VkDeviceMemory resolveMemory_ = VK_NULL_HANDLE;
+  VkImageView resolveView_ = VK_NULL_HANDLE;
+  VkDescriptorSetLayout resolveSetLayout_ = VK_NULL_HANDLE;
+  VkDescriptorPool resolvePool_ = VK_NULL_HANDLE;
+  VkDescriptorSet resolveSet_ = VK_NULL_HANDLE;
+  VkPipelineLayout resolveLayout_ = VK_NULL_HANDLE;
+  VkPipeline resolvePipeline_ = VK_NULL_HANDLE;
 
   gvk::FrameRing frames_;
 };

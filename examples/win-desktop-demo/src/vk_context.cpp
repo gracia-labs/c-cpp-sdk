@@ -48,10 +48,7 @@ bool VulkanContext::init(GLFWwindow* window, const char* appName) {
 }
 
 bool VulkanContext::createInstance(GLFWwindow* window, const char* appName) {
-  if (volkInitialize() != VK_SUCCESS) {
-    std::fprintf(stderr, "Vulkan loader not found (install a Vulkan runtime)\n");
-    return false;
-  }
+  if (!gvk::initVulkanLoader()) return false;
 
   VkApplicationInfo app{VK_STRUCTURE_TYPE_APPLICATION_INFO};
   app.pApplicationName = appName;

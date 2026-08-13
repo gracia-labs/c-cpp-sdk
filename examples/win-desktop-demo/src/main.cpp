@@ -392,6 +392,12 @@ int main(int argc, char** argv) {
   SetConsoleCtrlHandler(onConsoleCtrl, TRUE);
   const Options opts = parseArgs(argc, argv);
 
+  // Before glfwInit, and that order is the whole point: GLFW opens its own copy
+  // of the Vulkan loader unless it is handed one first. Give it volk's, so the
+  // demo, Dear ImGui, GLFW and the SDK all call through the same entry points.
+  if (!gvk::initVulkanLoader()) return 1;
+  glfwInitVulkanLoader(vkGetInstanceProcAddr);
+
   if (!glfwInit()) {
     std::fprintf(stderr, "glfwInit failed\n");
     return 1;
@@ -452,11 +458,8 @@ int main(int argc, char** argv) {
   ImGui_ImplGlfw_InitForVulkan(window, true);
   const gvk::Gpu gpu = ctx.gpu();
   VkDescriptorPool imguiPool = createImGuiPool(gpu.device);
-  ImGui_ImplVulkan_LoadFunctions(
-      [](const char* name, void* user) {
-        return vkGetInstanceProcAddr(reinterpret_cast<VkInstance>(user), name);
-      },
-      reinterpret_cast<void*>(gpu.instance));
+  // No ImGui_ImplVulkan_LoadFunctions: the backend is built with
+  // IMGUI_IMPL_VULKAN_USE_VOLK and shares our entry points already.
   ImGui_ImplVulkan_InitInfo init{};
   init.Instance = gpu.instance;
   init.PhysicalDevice = gpu.physicalDevice;
