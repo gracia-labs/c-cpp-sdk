@@ -19,7 +19,6 @@ bool XrViewer::load(const XrContext& xr,
                     const std::vector<std::filesystem::path>& scenes,
                     const std::string& streamUrl, const std::string& token) {
   color_ = xr.colorFormat();
-  pass_ = xr.renderPass();
   const bool ok = scenes.empty() ? player_.loadStream(streamUrl, token)
                                  : player_.loadScenes(scenes);
   return ok && rebuildRenderer();
@@ -113,8 +112,8 @@ void XrViewer::record(uint32_t slot, uint32_t eye, VkCommandBuffer cmd) {
   // Draw while buffering too: the SDK holds the last decoded frame.
   if (eye >= draws.color.views.size() || !draws.color.views[eye].has_value()) return;
 
+  // renderPass stays null: the SDK then records with dynamic rendering.
   GraciaRenderPass rp{};
   rp.commandBuffer = cmd;
-  rp.renderPass = pass_;
   draws.color.views[eye]->execute(rp);
 }

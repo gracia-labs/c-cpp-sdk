@@ -17,8 +17,9 @@ struct Frame {
 };
 
 // Minimal Vulkan device + swapchain: the splats and the ImGui overlay render
-// straight into the swapchain image through one shared color-only render pass.
-// The device setup, the render pass and the frame ring come from gracia_demo.
+// straight into the swapchain image with dynamic rendering, so there is no
+// VkRenderPass and no framebuffer. The device setup and the frame ring come
+// from gracia_demo.
 class VulkanContext {
  public:
   // Matches the SDK's per-frame ring depth (fuji uses 3); stay at or below it and
@@ -32,13 +33,13 @@ class VulkanContext {
     return {instance_, physicalDevice_, device_, pipelineCache_, queues_};
   }
   VkQueue graphicsQueue() const { return graphicsQueue_; }
-  VkRenderPass renderPass() const { return renderPass_; }
+  VkFormat colorFormat() const { return colorFormat_; }
   uint32_t minImageCount() const { return minImageCount_; }
   uint32_t imageCount() const { return (uint32_t)swapchainImages_.size(); }
 
   // beginFrame returns nullopt when the frame should be skipped (minimized /
-  // out-of-date swapchain). render() runs `body` inside a cleared color render
-  // pass with viewport/scissor set.
+  // out-of-date swapchain). render() runs `body` inside a cleared color
+  // rendering scope with viewport/scissor set.
   std::optional<Frame> beginFrame();
   void render(const Frame& frame, const std::function<void(VkCommandBuffer)>& body);
   void endFrame(const Frame& frame);
@@ -53,7 +54,6 @@ class VulkanContext {
   bool pickPhysicalDevice();
   bool createDevice();
   void createSwapchain();
-  void createFramebuffers();
   void destroySwapchainResources();
   void recreateSwapchain();
 
@@ -73,8 +73,6 @@ class VulkanContext {
   uint32_t minImageCount_ = 2;
   std::vector<VkImage> swapchainImages_;
   std::vector<VkImageView> swapchainViews_;
-  std::vector<VkFramebuffer> framebuffers_;
-  VkRenderPass renderPass_ = VK_NULL_HANDLE;
 
   gvk::FrameRing frames_;
   std::vector<VkSemaphore> imageAvailable_;  // per in-flight frame

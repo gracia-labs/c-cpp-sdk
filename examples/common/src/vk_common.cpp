@@ -51,19 +51,11 @@ DeviceRequest::DeviceRequest(VkPhysicalDevice gpu, const QueueFamilies& families
   available_.resize(availCount);
   vkEnumerateDeviceExtensionProperties(gpu, nullptr, &availCount, available_.data());
 
-  // Dropping an entry here leaves volk with null entry points for the SDK.
+  // The SDK resolves these two by their KHR names, so the promoted core
+  // versions alone are not enough. Everything else it uses is a feature below.
   static const char* const kWanted[] = {
-      VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME,
-      VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME,
+      VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
       VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
-      VK_KHR_MULTIVIEW_EXTENSION_NAME,
-      VK_KHR_8BIT_STORAGE_EXTENSION_NAME,
-      VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME,
-      VK_EXT_SHADER_VIEWPORT_INDEX_LAYER_EXTENSION_NAME,
-      VK_EXT_SAMPLER_FILTER_MINMAX_EXTENSION_NAME,
-      VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_EXTENSION_NAME,
-      VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME,
-      VK_EXT_TOOLING_INFO_EXTENSION_NAME,
   };
   if (wantSwapchain && has(VK_KHR_SWAPCHAIN_EXTENSION_NAME))
     extensions_.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
@@ -111,42 +103,58 @@ VkImageView createColorView(VkDevice device, VkImage image, VkFormat format) {
   return view;
 }
 
-VkRenderPass createColorRenderPass(VkDevice device, VkFormat format,
-                                   VkImageLayout finalLayout) {
-  VkAttachmentDescription color{};
-  color.format = format;
-  color.samples = VK_SAMPLE_COUNT_1_BIT;
+namespace {
+
+void colorImageBarrier(VkCommandBuffer cmd, VkImage image, VkImageLayout from,
+                       VkImageLayout to, VkAccessFlags srcAccess,
+                       VkAccessFlags dstAccess, VkPipelineStageFlags srcStage,
+                       VkPipelineStageFlags dstStage) {
+  VkImageMemoryBarrier b{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+  b.srcAccessMask = srcAccess;
+  b.dstAccessMask = dstAccess;
+  b.oldLayout = from;
+  b.newLayout = to;
+  b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  b.image = image;
+  b.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+  vkCmdPipelineBarrier(cmd, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &b);
+}
+
+}  // namespace
+
+void beginColorRendering(VkCommandBuffer cmd, VkImage image, VkImageView view,
+                         VkExtent2D extent, const VkClearValue& clear) {
+  // A render pass did this through initialLayout and a subpass dependency.
+  colorImageBarrier(cmd, image, VK_IMAGE_LAYOUT_UNDEFINED,
+                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0,
+                    VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                    VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                    VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+
+  VkRenderingAttachmentInfoKHR color{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR};
+  color.imageView = view;
+  color.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
   color.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
   color.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-  color.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-  color.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  color.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  color.finalLayout = finalLayout;
+  color.clearValue = clear;
 
-  VkAttachmentReference colorRef{0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
-  VkSubpassDescription subpass{};
-  subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-  subpass.colorAttachmentCount = 1;
-  subpass.pColorAttachments = &colorRef;
+  VkRenderingInfoKHR info{VK_STRUCTURE_TYPE_RENDERING_INFO_KHR};
+  info.renderArea = {{0, 0}, extent};
+  info.layerCount = 1;
+  info.colorAttachmentCount = 1;
+  info.pColorAttachments = &color;
+  vkCmdBeginRenderingKHR(cmd, &info);
+}
 
-  VkSubpassDependency dep{};
-  dep.srcSubpass = VK_SUBPASS_EXTERNAL;
-  dep.dstSubpass = 0;
-  dep.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  dep.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  dep.srcAccessMask = 0;
-  dep.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-  VkRenderPassCreateInfo rp{VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};
-  rp.attachmentCount = 1;
-  rp.pAttachments = &color;
-  rp.subpassCount = 1;
-  rp.pSubpasses = &subpass;
-  rp.dependencyCount = 1;
-  rp.pDependencies = &dep;
-  VkRenderPass pass = VK_NULL_HANDLE;
-  VK_CHECK(vkCreateRenderPass(device, &rp, nullptr, &pass));
-  return pass;
+void endColorRendering(VkCommandBuffer cmd, VkImage image,
+                       VkImageLayout finalLayout) {
+  vkCmdEndRenderingKHR(cmd);
+  if (finalLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) return;
+  colorImageBarrier(cmd, image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                    finalLayout, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 0,
+                    VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                    VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
 }
 
 void barrierComputeToGraphics(VkCommandBuffer cmd) {

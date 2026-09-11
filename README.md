@@ -24,11 +24,12 @@ For other platforms use the matching Gracia SDK:
 
 ```
 CMakeLists.txt                 Extracts the prebuilt SDK and exposes gracia::sdk
-AGENTS.md                      Rules for a player: the clock, the draw, frame lifetime
+AGENTS.md                      Rules for a player: the device, the clock, the draw
 artifacts/
   windows.zip                  Prebuilt SDK (include/, gracia_sdk.dll, gracia_sdk.lib)
   android.zip                  Prebuilt SDK (include/, libgracia_sdk.so, arm64-v8a)
 cmake/CPM.cmake                CPM.cmake package manager (used by the examples)
+deps/                          Vulkan headers, GLM, volk, GLFW, OpenXR, Dear ImGui
 examples/
   common/                      Shared viewer core (Vulkan setup, scenes, playback)
   win-desktop-demo/            Vulkan + Dear ImGui desktop scene viewer
@@ -36,16 +37,33 @@ examples/
 ```
 
 The archives ship prebuilt in this repository. Thus the examples build without
-a source checkout of the SDK core. The examples need other components: GLFW,
-Dear ImGui, GLM, the Vulkan headers, volk, and VMA. CPM fetches these components
-from GitHub on the first configure.
+a source checkout of the SDK core. Every other component ships in `deps/` as well,
+and [CPM](https://github.com/cpm-cmake/CPM.cmake) reads the archives from disk.
 
 ## Prerequisites
 
 - Windows 10/11 with a Vulkan 1.3 capable GPU and current drivers.
 - CMake ≥ 3.21 and a C++20 compiler (MSVC or clang-cl).
-- Network access on the first configure. The examples fetch GLFW, Dear ImGui, GLM,
-  the Vulkan headers, and volk with [CPM](https://github.com/cpm-cmake/CPM.cmake).
+- No network access: the build resolves every dependency from `deps/`.
+
+## Vulkan device requirements
+
+Your application creates the `VkInstance` and the `VkDevice`. `gvk::DeviceRequest`
+in [examples/common/src/vk_common.cpp](examples/common/src/vk_common.cpp) builds
+one that works.
+
+- **Vulkan 1.3**, instance and device.
+- **Extensions:** `VK_KHR_dynamic_rendering`, `VK_KHR_synchronization2`, and
+  `VK_KHR_swapchain` for your own present. Vulkan 1.3 promotes everything else
+  the SDK uses.
+- **Features:** read `VkPhysicalDeviceVulkan11Features`, `Vulkan12Features` and
+  `Vulkan13Features` with `vkGetPhysicalDeviceFeatures2` and pass the same chain
+  to `vkCreateDevice`. That enables all the device supports, which is what the
+  SDK needs.
+- **Queues:** the three family indexes can be equal. Submit and present on the
+  graphics family, index 0.
+
+`gracia_context_create()` returns null when the device is short of any of this.
 
 ## Build toolchain of the artifacts
 

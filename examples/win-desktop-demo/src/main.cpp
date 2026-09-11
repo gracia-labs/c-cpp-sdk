@@ -465,7 +465,11 @@ int main(int argc, char** argv) {
   init.Queue = ctx.graphicsQueue();
   init.PipelineCache = gpu.pipelineCache;
   init.DescriptorPool = imguiPool;
-  init.RenderPass = ctx.renderPass();
+  const VkFormat imguiColorFormat = ctx.colorFormat();
+  init.UseDynamicRendering = true;
+  init.PipelineRenderingCreateInfo = {VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR};
+  init.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
+  init.PipelineRenderingCreateInfo.pColorAttachmentFormats = &imguiColorFormat;
   init.MinImageCount = ctx.minImageCount();
   init.ImageCount = ctx.imageCount();
   init.MSAASamples = VK_SAMPLE_COUNT_1_BIT;

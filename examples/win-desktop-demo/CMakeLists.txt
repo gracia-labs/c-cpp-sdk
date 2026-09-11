@@ -19,8 +19,7 @@ endif()
 # --- Third-party dependencies for the desktop shell only ----------------------
 CPMAddPackage(
   NAME glfw
-  GITHUB_REPOSITORY glfw/glfw
-  GIT_TAG 3.4
+  URL "file://${SDK_ROOT}/deps/glfw-3.4.zip"
   OPTIONS
     "GLFW_BUILD_DOCS OFF"
     "GLFW_BUILD_TESTS OFF"
@@ -30,8 +29,7 @@ CPMAddPackage(
 
 CPMAddPackage(
   NAME imgui
-  GITHUB_REPOSITORY ocornut/imgui
-  GIT_TAG v1.90.9
+  URL "file://${SDK_ROOT}/deps/imgui-1.90.9.zip"
   DOWNLOAD_ONLY YES
 )
 

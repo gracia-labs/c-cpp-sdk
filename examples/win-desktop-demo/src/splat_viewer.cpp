@@ -182,9 +182,9 @@ void SplatViewer::record(const Frame& frame, VkCommandBuffer cmd) {
   if (draws.empty()) return;
 
   auto exec = [&](size_t i) {
+    // renderPass stays null: the SDK then records with dynamic rendering.
     GraciaRenderPass rp{};
     rp.commandBuffer = cmd;
-    rp.renderPass = ctx_.renderPass();
     auto& rc = draws[i].resolve.color;
     if (depthAsColor_ && !rc.views.empty() && rc.views[0].has_value())
       rc.views[0]->execute(rp);

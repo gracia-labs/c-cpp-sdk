@@ -72,10 +72,13 @@ class DeviceRequest {
 VkPipelineCache createPipelineCache(VkDevice device);
 VkImageView createColorView(VkDevice device, VkImage image, VkFormat format);
 
-// Color only. finalLayout is PRESENT_SRC_KHR for a window,
-// COLOR_ATTACHMENT_OPTIMAL for OpenXR.
-VkRenderPass createColorRenderPass(VkDevice device, VkFormat format,
-                                   VkImageLayout finalLayout);
+// One cleared color attachment through dynamic rendering. begin() takes the
+// image from UNDEFINED to COLOR_ATTACHMENT_OPTIMAL, end() leaves it in
+// finalLayout: PRESENT_SRC_KHR for a window, COLOR_ATTACHMENT_OPTIMAL for OpenXR.
+void beginColorRendering(VkCommandBuffer cmd, VkImage image, VkImageView view,
+                         VkExtent2D extent, const VkClearValue& clear);
+void endColorRendering(VkCommandBuffer cmd, VkImage image,
+                       VkImageLayout finalLayout);
 
 // Makes the SDK's compute prep visible to the splat draws.
 void barrierComputeToGraphics(VkCommandBuffer cmd);

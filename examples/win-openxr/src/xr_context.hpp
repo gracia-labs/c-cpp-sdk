@@ -54,7 +54,7 @@ class XrContext {
   gvk::Gpu gpu() const {
     return {vkInstance_, physicalDevice_, device_, pipelineCache_, queues_};
   }
-  VkRenderPass renderPass() const { return renderPass_; }
+  VkFormat viewFormat() const { return viewFormat_; }
   // Always matches the render pass attachment and the XR swapchain format.
   GraciaColorFormat colorFormat() const { return graciaColorFormat_; }
   const std::string& runtimeName() const { return runtimeName_; }
@@ -86,7 +86,7 @@ class XrContext {
   bool createVulkan();
   bool createSession();
   bool createSwapchains();
-  void createFramebuffers();
+  void createEyeViews();
 
   XrInstance instance_ = XR_NULL_HANDLE;
   XrSystemId systemId_ = XR_NULL_SYSTEM_ID;
@@ -110,7 +110,6 @@ class XrContext {
     XrSwapchain swapchain = XR_NULL_HANDLE;
     std::vector<XrSwapchainImageVulkan2KHR> images;  // the runtime owns the VkImages
     std::vector<VkImageView> views;
-    std::vector<VkFramebuffer> framebuffers;
   };
   std::array<Eye, kEyes> eyes_{};
   std::array<XrViewConfigurationView, kEyes> cfgViews_{};
@@ -129,7 +128,6 @@ class XrContext {
   VkFormat swapchainFormat_ = VK_FORMAT_UNDEFINED;
   VkFormat viewFormat_ = VK_FORMAT_UNDEFINED;
   GraciaColorFormat graciaColorFormat_ = GRACIA_COLOR_FORMAT_RGBA8_UNORM;
-  VkRenderPass renderPass_ = VK_NULL_HANDLE;
 
   gvk::FrameRing frames_;
 };

@@ -7,24 +7,26 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 get_filename_component(SDK_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
 include("${SDK_ROOT}/cmake/CPM.cmake")
 
-# --- Dependencies every viewer needs (fetched from GitHub with CPM) -----------
-# Vulkan-Headers is pinned to the SDK version volk targets.
+# --- Dependencies every viewer needs -----------------------------------------
+# Vulkan-Headers and glm ship as local archives in deps/; they are the same
+# versions gracia_sdk.dll itself was built against.
 CPMAddPackage(
   NAME Vulkan-Headers
-  GITHUB_REPOSITORY KhronosGroup/Vulkan-Headers
-  GIT_TAG v1.4.304
+  URL "file://${SDK_ROOT}/deps/Vulkan-Headers-1.4.357.zip"
 )
 
+# Headers only, so the archive carries no CMakeLists and defines no target.
 CPMAddPackage(
   NAME glm
-  GITHUB_REPOSITORY g-truc/glm
-  GIT_TAG 1.0.1
+  URL "file://${SDK_ROOT}/deps/glm-1.0.1-light.zip"
 )
+add_library(glm_headers INTERFACE)
+add_library(glm::glm ALIAS glm_headers)
+target_include_directories(glm_headers INTERFACE "${glm_SOURCE_DIR}")
 
 CPMAddPackage(
   NAME volk
-  GITHUB_REPOSITORY zeux/volk
-  GIT_TAG vulkan-sdk-1.4.304.0
+  URL "file://${SDK_ROOT}/deps/volk-vulkan-sdk-1.4.304.0.zip"
   DOWNLOAD_ONLY YES
 )
 

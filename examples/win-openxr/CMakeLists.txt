@@ -18,8 +18,7 @@ endif()
 # static openxr_loader.lib, so there is no second DLL to copy.
 CPMAddPackage(
   NAME OpenXR
-  GITHUB_REPOSITORY KhronosGroup/OpenXR-SDK
-  GIT_TAG release-1.1.61
+  URL "file://${SDK_ROOT}/deps/OpenXR-SDK-release-1.1.61.zip"
   OPTIONS
     "DYNAMIC_LOADER OFF"
     "BUILD_TESTING OFF"

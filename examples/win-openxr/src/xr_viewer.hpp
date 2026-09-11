@@ -46,5 +46,4 @@ class XrViewer {
   bool checkedStereo_ = false;
   float scale_ = 0.75f, distance_ = 0.5f, height_ = 0.5f;
   GraciaColorFormat color_ = GRACIA_COLOR_FORMAT_RGBA8_UNORM;
-  VkRenderPass pass_ = VK_NULL_HANDLE;
 };

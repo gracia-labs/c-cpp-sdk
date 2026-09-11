@@ -46,12 +46,36 @@ in `SplatsPlayer::advance`. Fix a clock defect there, not in a viewer.
    only network check.
 9. Decode state is status for the HUD. It never gates the clock, with the one exception in rule 4.
 
+## The Vulkan device
+
+Your application creates the device; the SDK never does.
+[`README.md`](README.md#vulkan-device-requirements) lists what it must carry, and
+`gvk::DeviceRequest` in [`examples/common`](examples/common/src/vk_common.cpp) builds it.
+
+- Enable `VK_KHR_dynamic_rendering` and `VK_KHR_synchronization2` as extensions. The SDK calls
+  the `KHR` entry points, and the promoted core 1.3 ones do not fill those slots.
+- Read the supported feature chain and pass the same chain to `vkCreateDevice`.
+- `gracia_context_create()` returns null on a device that is short. It is not a crash and not an
+  exception, so check the return value.
+
+## Dynamic rendering
+
+The examples record with `vkCmdBeginRenderingKHR`, so they build no `VkRenderPass` and no
+`VkFramebuffer`. `gvk::beginColorRendering` and `gvk::endColorRendering` in
+[`examples/common`](examples/common/) hold the two image barriers that a render pass used to do
+through `initialLayout`, `finalLayout` and a subpass dependency.
+
+One rule follows from it: leave `GraciaRenderPass::renderPass` **null**. The SDK then builds its
+pipelines for dynamic rendering. Give it a real `VkRenderPass` only when your own frame still uses
+one; the SDK serves both, and it keys its pipeline cache on that handle. Either way the device needs
+`VK_KHR_dynamic_rendering`, because the SDK draws splats into its own targets.
+
 ## The draw
 
 10. Execute the draw calls in each frame, also when `DrawCalls::buffering` is true. The SDK keeps the
     last decoded frame on its display slot, so the picture holds still.
-11. Do not skip the draw for a scene that buffers. The render pass clears the swapchain image, so a
-    skipped draw gives a black frame. A rewind sets and clears `buffering` many times, and the screen
+11. Do not skip the draw for a scene that buffers. The rendering scope clears the swapchain image, so
+    a skipped draw gives a black frame. A rewind sets and clears `buffering` many times, and the screen
     flickers between the frame that the SDK holds and the new frame.
 12. `buffering` is status for the HUD. It is not a draw gate. Gate on the color view alone:
     `!views.empty() && views[0].has_value()`.
@@ -89,9 +113,9 @@ in `SplatsPlayer::advance`. Fix a clock defect there, not in a viewer.
     `XrResult` **and** the `vulkanResult` output: a success with a failed `vulkanResult` gives a null
     handle. Name the graphics family and queue index 0 in the graphics binding, which is the queue of
     rule 15.
-23. The final layout of the render pass is `COLOR_ATTACHMENT_OPTIMAL`, not `PRESENT_SRC_KHR`. Keep
-    the initial layout `UNDEFINED`: the runtime promises only a compatible layout, so you cannot
-    transition from a known one.
+23. Leave the eye image in `COLOR_ATTACHMENT_OPTIMAL`, not `PRESENT_SRC_KHR`. Transition it from
+    `UNDEFINED`: the runtime promises only a compatible layout, so you cannot transition from a known
+    one. `gvk::endColorRendering` takes the final layout for this reason.
 24. Release a swapchain image **after** the queue submit, never before. The runtime accepts an image
     whose command buffer still runs, but not one that was only recorded.
 25. Call `xrBeginFrame` and `xrEndFrame` for every frame, also when `shouldRender` is false, and keep

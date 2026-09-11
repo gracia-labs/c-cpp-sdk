@@ -35,9 +35,6 @@ bool VulkanContext::init(GLFWwindow* window, const char* appName) {
   if (!createDevice()) return false;
   pipelineCache_ = gvk::createPipelineCache(device_);
   createSwapchain();
-  renderPass_ = gvk::createColorRenderPass(device_, colorFormat_,
-                                           VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-  createFramebuffers();
   frames_.init(device_, queues_.graphics, kFramesInFlight);
 
   imageAvailable_.resize(kFramesInFlight);
@@ -189,20 +186,6 @@ void VulkanContext::createSwapchain() {
   }
 }
 
-void VulkanContext::createFramebuffers() {
-  framebuffers_.resize(swapchainViews_.size());
-  for (size_t i = 0; i < swapchainViews_.size(); ++i) {
-    VkFramebufferCreateInfo fi{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
-    fi.renderPass = renderPass_;
-    fi.attachmentCount = 1;
-    fi.pAttachments = &swapchainViews_[i];
-    fi.width = extent_.width;
-    fi.height = extent_.height;
-    fi.layers = 1;
-    VK_CHECK(vkCreateFramebuffer(device_, &fi, nullptr, &framebuffers_[i]));
-  }
-}
-
 std::optional<Frame> VulkanContext::beginFrame() {
   int w = 0, h = 0;
   glfwGetFramebufferSize(window_, &w, &h);
@@ -234,14 +217,8 @@ void VulkanContext::render(const Frame& frame,
 
   VkClearValue clear{};
   clear.color = {{0.02f, 0.02f, 0.03f, 1.0f}};
-
-  VkRenderPassBeginInfo bi{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
-  bi.renderPass = renderPass_;
-  bi.framebuffer = framebuffers_[frame.imageIndex];
-  bi.renderArea = {{0, 0}, extent_};
-  bi.clearValueCount = 1;
-  bi.pClearValues = &clear;
-  vkCmdBeginRenderPass(frame.cmd, &bi, VK_SUBPASS_CONTENTS_INLINE);
+  gvk::beginColorRendering(frame.cmd, swapchainImages_[frame.imageIndex],
+                           swapchainViews_[frame.imageIndex], extent_, clear);
 
   VkViewport vp{0.0f, 0.0f, (float)extent_.width, (float)extent_.height, 0.0f, 1.0f};
   VkRect2D scissor{{0, 0}, extent_};
@@ -249,7 +226,8 @@ void VulkanContext::render(const Frame& frame,
   vkCmdSetScissor(frame.cmd, 0, 1, &scissor);
 
   body(frame.cmd);
-  vkCmdEndRenderPass(frame.cmd);
+  gvk::endColorRendering(frame.cmd, swapchainImages_[frame.imageIndex],
+                         VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 }
 
 void VulkanContext::endFrame(const Frame& frame) {
@@ -282,10 +260,8 @@ void VulkanContext::endFrame(const Frame& frame) {
 }
 
 void VulkanContext::destroySwapchainResources() {
-  for (auto fb : framebuffers_) vkDestroyFramebuffer(device_, fb, nullptr);
   for (auto v : swapchainViews_) vkDestroyImageView(device_, v, nullptr);
   for (auto s : renderFinished_) vkDestroySemaphore(device_, s, nullptr);
-  framebuffers_.clear();
   swapchainViews_.clear();
   renderFinished_.clear();
   if (swapchain_) vkDestroySwapchainKHR(device_, swapchain_, nullptr);
@@ -302,14 +278,12 @@ void VulkanContext::recreateSwapchain() {
   vkDeviceWaitIdle(device_);
   destroySwapchainResources();
   createSwapchain();
-  createFramebuffers();
 }
 
 void VulkanContext::shutdown() {
   if (!device_) return;
   vkDeviceWaitIdle(device_);
   destroySwapchainResources();
-  if (renderPass_) vkDestroyRenderPass(device_, renderPass_, nullptr);
   for (auto s : imageAvailable_) vkDestroySemaphore(device_, s, nullptr);
   imageAvailable_.clear();
   frames_.destroy(device_);

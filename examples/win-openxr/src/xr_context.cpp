@@ -18,10 +18,7 @@ bool XrContext::init(const char* appName) {
   pipelineCache_ = gvk::createPipelineCache(device_);
   if (!createSession()) return false;
   if (!createSwapchains()) return false;
-  // Not PRESENT_SRC_KHR: these images are the runtime's, not a window's.
-  renderPass_ = gvk::createColorRenderPass(device_, viewFormat_,
-                                           VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-  createFramebuffers();
+  createEyeViews();
   frames_.init(device_, queues_.graphics, kFramesInFlight);
   return true;
 }
@@ -294,21 +291,11 @@ bool XrContext::createSwapchains() {
   return true;
 }
 
-void XrContext::createFramebuffers() {
+void XrContext::createEyeViews() {
   for (auto& eye : eyes_) {
     eye.views.resize(eye.images.size());
-    eye.framebuffers.resize(eye.images.size());
-    for (size_t i = 0; i < eye.images.size(); ++i) {
+    for (size_t i = 0; i < eye.images.size(); ++i)
       eye.views[i] = gvk::createColorView(device_, eye.images[i].image, viewFormat_);
-      VkFramebufferCreateInfo fi{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
-      fi.renderPass = renderPass_;
-      fi.attachmentCount = 1;
-      fi.pAttachments = &eye.views[i];
-      fi.width = eyeExtent_.width;
-      fi.height = eyeExtent_.height;
-      fi.layers = 1;
-      VK_CHECK(vkCreateFramebuffer(device_, &fi, nullptr, &eye.framebuffers[i]));
-    }
   }
 }
 
@@ -431,13 +418,9 @@ void XrContext::render(XrFrameCtx& f,
 
     VkClearValue clear{};
     clear.color = {{0.02f, 0.02f, 0.03f, 1.0f}};
-    VkRenderPassBeginInfo bi{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
-    bi.renderPass = renderPass_;
-    bi.framebuffer = eyes_[eye].framebuffers[index];
-    bi.renderArea = {{0, 0}, eyeExtent_};
-    bi.clearValueCount = 1;
-    bi.pClearValues = &clear;
-    vkCmdBeginRenderPass(f.cmd, &bi, VK_SUBPASS_CONTENTS_INLINE);
+    // Not PRESENT_SRC_KHR: these images are the runtime's, not a window's.
+    gvk::beginColorRendering(f.cmd, eyes_[eye].images[index].image,
+                             eyes_[eye].views[index], eyeExtent_, clear);
 
     VkViewport vp{0.0f, 0.0f, (float)eyeExtent_.width, (float)eyeExtent_.height,
                   0.0f, 1.0f};
@@ -446,7 +429,8 @@ void XrContext::render(XrFrameCtx& f,
     vkCmdSetScissor(f.cmd, 0, 1, &scissor);
 
     body(f.cmd, eye);
-    vkCmdEndRenderPass(f.cmd);
+    gvk::endColorRendering(f.cmd, eyes_[eye].images[index].image,
+                           VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   }
 }
 
@@ -490,17 +474,14 @@ void XrContext::shutdown() {
   if (device_) vkDeviceWaitIdle(device_);
 
   for (auto& eye : eyes_) {
-    for (auto fb : eye.framebuffers) vkDestroyFramebuffer(device_, fb, nullptr);
+
     for (auto v : eye.views) vkDestroyImageView(device_, v, nullptr);
-    eye.framebuffers.clear();
     eye.views.clear();
     if (eye.swapchain) xrDestroySwapchain(eye.swapchain);
     eye.swapchain = XR_NULL_HANDLE;
   }
-  if (renderPass_) vkDestroyRenderPass(device_, renderPass_, nullptr);
   frames_.destroy(device_);
   if (pipelineCache_) vkDestroyPipelineCache(device_, pipelineCache_, nullptr);
-  renderPass_ = VK_NULL_HANDLE;
   pipelineCache_ = VK_NULL_HANDLE;
 
   if (appSpace_) xrDestroySpace(appSpace_);
