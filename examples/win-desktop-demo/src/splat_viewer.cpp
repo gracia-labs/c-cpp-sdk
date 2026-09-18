@@ -59,6 +59,7 @@ bool SplatViewer::rebuildRenderers() {
       return false;
     }
     r.setFlag("splats_count_readback", true);
+    r.setFlag("legacy_pipeline", legacyPipeline_);
     renderers_.push_back({std::move(r), gracia::SdkDepthResolver::create(player_.sdk())});
   }
   return true;
@@ -70,6 +71,11 @@ void SplatViewer::setLayout(SceneLayout layout) {
   layout_ = layout;
   rebuildRenderers();
   split_.reset(layout_ == SceneLayout::Split ? (int)player_.sceneCount() : 0);
+}
+
+void SplatViewer::toggleLegacyPipeline() {
+  legacyPipeline_ = !legacyPipeline_;
+  for (auto& r : renderers_) r.splats.setFlag("legacy_pipeline", legacyPipeline_);
 }
 
 void SplatViewer::reframe() {

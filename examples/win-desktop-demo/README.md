@@ -108,6 +108,10 @@ Options: `--split`, `--stream <url>`, `--token <t>`, `--zoom <f>`, `--seek <s>`.
 | 0                     | Reset framing                       |
 | M                     | Toggle mix / split                  |
 
+`View > Legacy pipeline` prepares and sorts the splats without subgroup operations.
+Use it on a GPU that does not support these operations. See
+[Legacy pipeline](../../README.md#legacy-pipeline).
+
 ## Layout
 
 ```

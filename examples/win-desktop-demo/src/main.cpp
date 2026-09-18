@@ -211,6 +211,11 @@ void drawMenuBar(GLFWwindow* window, SplatViewer& viewer, bool& openStream,
       viewer.toggleDepthAsColor();
     if (ImGui::MenuItem("Linearize depth", "L", viewer.depthLinear(), viewer.depthAsColor()))
       viewer.toggleDepthLinear();
+    ImGui::Separator();
+    if (ImGui::MenuItem("Legacy pipeline", nullptr, viewer.legacyPipeline()))
+      viewer.toggleLegacyPipeline();
+    if (ImGui::IsItemHovered())
+      ImGui::SetTooltip("Prepare and sort splats without subgroup operations");
     ImGui::EndMenu();
   }
   ImGui::EndMainMenuBar();

@@ -1,16 +1,16 @@
 # Gracia C/C++ SDK
 
 The Gracia C/C++ SDK renders Gaussian-splat scenes and volumetric videos on your
-own GPU device. On Windows and on Android the SDK uses **Vulkan**. The public
+own GPU device. On Windows, Android and Linux the SDK uses **Vulkan**. The public
 surface is a small C ABI (`gracia/SDK.h`) with a header-only C++ wrapper
 (`gracia/SDK.hpp`).
 
 ## Platforms
 
-This SDK ships a prebuilt binary for **Windows x64** and for **Android
-arm64-v8a**. [CMakeLists.txt](CMakeLists.txt) selects the archive that matches
-the target platform. The **examples are Windows only**: on Android link
-`gracia::sdk` from your own build.
+This SDK ships a prebuilt binary for **Windows x64**, **Android arm64-v8a**
+and **Linux x86_64**. [CMakeLists.txt](CMakeLists.txt) selects the archive that
+matches the target platform. The **examples are Windows only**: on Android and
+on Linux link `gracia::sdk` from your own build.
 
 For other platforms use the matching Gracia SDK:
 
@@ -28,6 +28,7 @@ AGENTS.md                      Rules for a player: the device, the clock, the dr
 artifacts/
   windows.zip                  Prebuilt SDK (include/, gracia_sdk.dll, gracia_sdk.lib)
   android.zip                  Prebuilt SDK (include/, libgracia_sdk.so, arm64-v8a)
+  linux.zip                    Prebuilt SDK (include/, libgracia_sdk.so, x86_64)
 cmake/CPM.cmake                CPM.cmake package manager (used by the examples)
 deps/                          Vulkan headers, GLM, volk, GLFW, OpenXR, Dear ImGui
 examples/
@@ -53,8 +54,8 @@ in [examples/common/src/vk_common.cpp](examples/common/src/vk_common.cpp) builds
 one that works.
 
 - **Vulkan 1.3**, instance and device.
-- **Extensions:** `VK_KHR_dynamic_rendering`, `VK_KHR_synchronization2`, and
-  `VK_KHR_swapchain` for your own present. Vulkan 1.3 promotes everything else
+- **Extensions:** `VK_KHR_dynamic_rendering`, `VK_KHR_synchronization2`,
+  `VK_KHR_push_descriptor`, and `VK_KHR_swapchain` for your own present. Vulkan 1.3 promotes everything else
   the SDK uses.
 - **Features:** read `VkPhysicalDeviceVulkan11Features`, `Vulkan12Features` and
   `Vulkan13Features` with `vkGetPhysicalDeviceFeatures2` and pass the same chain
@@ -65,15 +66,38 @@ one that works.
 
 `gracia_context_create()` returns null when the device is short of any of this.
 
+## Legacy pipeline
+
+The SDK prepares and sorts the splats in compute shaders that use subgroup
+operations. Some GPUs and drivers do not support these operations correctly. For
+these devices, the renderer flag `legacy_pipeline` selects a second set of
+shaders that has no subgroup operations.
+
+```cpp
+renderer.setFlag("legacy_pipeline", true);
+```
+
+```c
+gracia_splats_renderer_set_flag(renderer, "legacy_pipeline", true);
+```
+
+- The default value is `false`.
+- The legacy pipeline gives the same image. The preparation of the splats is
+  approximately two times slower.
+- A change of the flag waits until the GPU is idle, and then replaces the sort.
+  Set the flag before the first frame.
+- Warmup compiles only the shaders of the active pipeline. When you change the
+  flag later, the shaders of the other pipeline compile on their first use.
+
 ## Build toolchain of the artifacts
 
-| | Windows | Android |
-| --- | --- | --- |
-| Target | x64 | arm64-v8a |
-| Compiler | clang-cl (LLVM 22) | NDK **r27d** (27.3.13750724), Android clang 18 |
-| Minimum platform | Windows 10, Vulkan 1.3 | API level 32 (Android 12L) |
-| C++ runtime | C++20, static CRT (`/MT`) | C++20, static libc++ (`c++_static`) |
-| Build | Ninja, Release | Ninja, Release |
+| | Windows | Android | Linux |
+| --- | --- | --- | --- |
+| Target | x64 | arm64-v8a | x86_64 |
+| Compiler | clang-cl (LLVM 22) | NDK **r27d** (27.3.13750724), Android clang 18 | GCC 13 (`gcc-toolset-13`), manylinux_2_28 |
+| Minimum platform | Windows 10, Vulkan 1.3 | API level 32 (Android 12L) | glibc 2.27, Vulkan 1.3 |
+| C++ runtime | C++20, static CRT (`/MT`) | C++20, static libc++ (`c++_static`) | C++20, system `libstdc++.so.6` (GCC 6 or later) |
+| Build | Ninja, Release | Ninja, Release | Ninja, Release |
 
 These are the versions of the build, not a requirement of your own toolchain. A
 different compiler or a newer NDK links against the artifacts correctly: the
@@ -86,6 +110,8 @@ C++ ABI between your code and the library.
 - The Android build uses `ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON`. Its segments
   align to 16 KB, thus it loads on a device with 16 KB memory pages.
 - The Windows DLL uses the static CRT. No Visual C++ redistributable is needed.
+- The Linux library needs only `libc`, `libm`, `libdl`, `libpthread`,
+  `libgcc_s` and `libstdc++`. It exports only the `gracia_*` functions.
 - Neither library links the Vulkan loader. The SDK loads Vulkan at run time.
 
 ## Building the examples
@@ -113,6 +139,11 @@ target_link_libraries(my_app PRIVATE gracia::sdk)
 On Android, configure with the NDK toolchain and `ANDROID_ABI=arm64-v8a`. The
 same `add_subdirectory` gives `gracia::sdk`, backed by `libgracia_sdk.so`. Put
 that library into `jniLibs/arm64-v8a/` of your APK.
+
+On Linux, the same `add_subdirectory` gives `gracia::sdk`, backed by
+`libgracia_sdk.so`. CMake puts the directory of the library into the `RPATH` of
+your executable. When you install your application, put `libgracia_sdk.so` next
+to it or on the library path.
 
 ## Examples
 

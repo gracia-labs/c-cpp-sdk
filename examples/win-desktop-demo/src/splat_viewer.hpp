@@ -81,6 +81,9 @@ class SplatViewer {
   // Depth-as-color: linearized (near/far-normalized) vs raw projected device depth.
   bool depthLinear() const { return depthLinear_; }
   void toggleDepthLinear() { depthLinear_ = !depthLinear_; }
+  // Prepare and sort without subgroup operations, for GPUs that lack them.
+  bool legacyPipeline() const { return legacyPipeline_; }
+  void toggleLegacyPipeline();
 
   uint32_t visibleSplats() const;
 
@@ -94,6 +97,7 @@ class SplatViewer {
   std::vector<SceneRenderer> renderers_;
   bool depthAsColor_ = false;
   bool depthLinear_ = false;
+  bool legacyPipeline_ = false;
   SceneLayout layout_ = SceneLayout::Mix;
   SplitLayout split_;
 

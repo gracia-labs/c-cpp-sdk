@@ -10,9 +10,9 @@ every rule below: [`examples/win-desktop-demo`](examples/win-desktop-demo/) on a
 
 ## Orientation
 
-The SDK is a prebuilt binary in `artifacts/windows.zip` and `artifacts/android.zip`: a C ABI
-(`gracia/SDK.h`) and a header-only C++ wrapper (`gracia/SDK.hpp`). On Windows and on Android the SDK
-renders with Vulkan. The two examples are Windows only.
+The SDK is a prebuilt binary in `artifacts/windows.zip`, `artifacts/android.zip` and
+`artifacts/linux.zip`: a C ABI (`gracia/SDK.h`) and a header-only C++ wrapper (`gracia/SDK.hpp`). On
+Windows, Android and Linux the SDK renders with Vulkan. The two examples are Windows only.
 
 Correct a playback defect in the player, not in the SDK. The SDK core and the video loader are shared
 with the Apple SDK and the Python SDK, and both are validated there. The Mac viewer
@@ -52,8 +52,9 @@ Your application creates the device; the SDK never does.
 [`README.md`](README.md#vulkan-device-requirements) lists what it must carry, and
 `gvk::DeviceRequest` in [`examples/common`](examples/common/src/vk_common.cpp) builds it.
 
-- Enable `VK_KHR_dynamic_rendering` and `VK_KHR_synchronization2` as extensions. The SDK calls
-  the `KHR` entry points, and the promoted core 1.3 ones do not fill those slots.
+- Enable `VK_KHR_dynamic_rendering`, `VK_KHR_synchronization2` and `VK_KHR_push_descriptor` as
+  extensions. The SDK calls the `KHR` entry points, and the promoted core ones do not fill those
+  slots.
 - Read the supported feature chain and pass the same chain to `vkCreateDevice`.
 - `gracia_context_create()` returns null on a device that is short. It is not a crash and not an
   exception, so check the return value.
