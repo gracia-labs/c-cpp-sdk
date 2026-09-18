@@ -40,16 +40,16 @@ target_link_libraries(win_openxr_demo PRIVATE
   openxr_loader
 )
 
-target_compile_definitions(win_openxr_demo PRIVATE
-  XR_USE_GRAPHICS_API_VULKAN
-  XR_USE_PLATFORM_WIN32
-)
+target_compile_definitions(win_openxr_demo PRIVATE XR_USE_GRAPHICS_API_VULKAN)
 
+# On Linux the executable finds libgracia_sdk.so next to itself, like the DLL.
 set_target_properties(win_openxr_demo PROPERTIES
-  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+  BUILD_WITH_INSTALL_RPATH ON
+  INSTALL_RPATH "$ORIGIN")
 
-# Put gracia_sdk.dll next to the executable so it loads at runtime.
+# Put the SDK library next to the executable so it loads at runtime.
 add_custom_command(TARGET win_openxr_demo POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
     "$<TARGET_FILE:gracia::sdk>" "$<TARGET_FILE_DIR:win_openxr_demo>"
-  COMMENT "Copying gracia_sdk.dll next to the demo executable")
+  COMMENT "Copying the SDK library next to the demo executable")

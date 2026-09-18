@@ -9,8 +9,8 @@ surface is a small C ABI (`gracia/SDK.h`) with a header-only C++ wrapper
 
 This SDK ships a prebuilt binary for **Windows x64**, **Android arm64-v8a**
 and **Linux x86_64**. [CMakeLists.txt](CMakeLists.txt) selects the archive that
-matches the target platform. The **examples are Windows only**: on Android and
-on Linux link `gracia::sdk` from your own build.
+matches the target platform. The **examples run on Windows and Linux**: on
+Android link `gracia::sdk` from your own build.
 
 For other platforms use the matching Gracia SDK:
 
@@ -30,11 +30,17 @@ artifacts/
   android.zip                  Prebuilt SDK (include/, libgracia_sdk.so, arm64-v8a)
   linux.zip                    Prebuilt SDK (include/, libgracia_sdk.so, x86_64)
 cmake/CPM.cmake                CPM.cmake package manager (used by the examples)
-deps/                          Vulkan headers, GLM, volk, GLFW, OpenXR, Dear ImGui
+deps/                          Vulkan headers, GLM, volk, GLFW, OpenXR, Dear ImGui,
+                               portable-file-dialogs
+docker/linux.Dockerfile        Toolchain image of the Linux build of the examples
 examples/
   common/                      Shared viewer core (Vulkan setup, scenes, playback)
   win-desktop-demo/            Vulkan + Dear ImGui desktop scene viewer
   win-openxr/                  OpenXR + Vulkan stereo headset viewer
+package.json                   The build:linux command
+prebuilt/
+  linux-x86_64.zip             Linux examples, ready to run (see Linux build)
+scripts/build-linux.js         Builds prebuilt/linux-x86_64.zip in Docker
 ```
 
 The archives ship prebuilt in this repository. Thus the examples build without
@@ -43,8 +49,9 @@ and [CPM](https://github.com/cpm-cmake/CPM.cmake) reads the archives from disk.
 
 ## Prerequisites
 
-- Windows 10/11 with a Vulkan 1.3 capable GPU and current drivers.
-- CMake ≥ 3.21 and a C++20 compiler (MSVC or clang-cl).
+- Windows 10/11 or Linux x86_64 with a Vulkan 1.3 capable GPU and current drivers.
+- CMake ≥ 3.21 and a C++20 compiler (MSVC or clang-cl on Windows, GCC or Clang
+  on Linux).
 - No network access: the build resolves every dependency from `deps/`.
 
 ## Vulkan device requirements
@@ -144,6 +151,28 @@ On Linux, the same `add_subdirectory` gives `gracia::sdk`, backed by
 `libgracia_sdk.so`. CMake puts the directory of the library into the `RPATH` of
 your executable. When you install your application, put `libgracia_sdk.so` next
 to it or on the library path.
+
+## Linux build
+
+`build:linux` builds both examples in Docker and writes one archive:
+
+```sh
+bun run build:linux
+```
+
+- **Needs:** Docker and [Bun](https://bun.sh). No other toolchain.
+- **Output:** `prebuilt/linux-x86_64.zip`, with `libgracia_sdk.so`,
+  `win_desktop_demo` and `win_openxr_demo`.
+- The image is manylinux_2_28 with GCC 14. Thus the executables run on glibc
+  2.28 and later. Each build is a clean build.
+
+To run the examples, extract the archive and start an executable from that
+directory. Each executable finds `libgracia_sdk.so` next to itself.
+
+- **Desktop viewer:** an X11 or Wayland session and a Vulkan driver.
+  **File ▸ Open** uses `zenity` or `kdialog`. Without them, drop files on the window.
+- **Headset viewer:** an OpenXR runtime with `XR_KHR_vulkan_enable2`, for
+  example [Monado](https://monado.freedesktop.org/).
 
 ## Examples
 

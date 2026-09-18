@@ -73,12 +73,12 @@ if(GRACIA_SDK_IMPLIB)
     IMPORTED_IMPLIB "${GRACIA_SDK_DIR}/${GRACIA_SDK_IMPLIB}")
 endif()
 
-# The examples are Windows only: they use a Win32 surface, a desktop OpenXR
-# runtime and GLFW. On Android and on Linux link gracia::sdk from your own build.
-if(GRACIA_BUILD_EXAMPLES AND WIN32)
+# The examples run on Windows and Linux: GLFW gives the window and a desktop
+# OpenXR runtime the headset. On Android link gracia::sdk from your own build.
+if(GRACIA_BUILD_EXAMPLES AND GRACIA_SDK_PLATFORM MATCHES "^(windows|linux)$")
   add_subdirectory(examples/common)   # shared viewer core, used by both examples
   add_subdirectory(examples/win-desktop-demo)
   add_subdirectory(examples/win-openxr)
 elseif(GRACIA_BUILD_EXAMPLES)
-  message(STATUS "Gracia SDK: the examples are Windows only; skipped.")
+  message(STATUS "Gracia SDK: the examples are Windows and Linux only; skipped.")
 endif()

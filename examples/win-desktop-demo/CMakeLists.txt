@@ -33,6 +33,16 @@ CPMAddPackage(
   DOWNLOAD_ONLY YES
 )
 
+# One header: Win32 dialogs on Windows, zenity or kdialog on Linux. Its own
+# CMakeLists asks for a CMake older than 3.5, so only the header is used.
+CPMAddPackage(
+  NAME portable_file_dialogs
+  URL "file://${SDK_ROOT}/deps/portable-file-dialogs-c12ea8c.zip"
+  DOWNLOAD_ONLY YES
+)
+add_library(portable_file_dialogs INTERFACE)
+target_include_directories(portable_file_dialogs INTERFACE "${portable_file_dialogs_SOURCE_DIR}")
+
 # --- Dear ImGui (core + GLFW/Vulkan backends) ---------------------------------
 add_library(imgui STATIC
   "${imgui_SOURCE_DIR}/imgui.cpp"
@@ -61,7 +71,7 @@ target_link_libraries(win_desktop_demo PRIVATE
   gracia_demo_common
   imgui
   glfw
-  comdlg32
+  portable_file_dialogs
 )
 
 target_compile_definitions(win_desktop_demo PRIVATE
@@ -69,11 +79,14 @@ target_compile_definitions(win_desktop_demo PRIVATE
   GLFW_INCLUDE_NONE
 )
 
+# On Linux the executable finds libgracia_sdk.so next to itself, like the DLL.
 set_target_properties(win_desktop_demo PROPERTIES
-  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+  BUILD_WITH_INSTALL_RPATH ON
+  INSTALL_RPATH "$ORIGIN")
 
-# Put gracia_sdk.dll next to the executable so it loads at runtime.
+# Put the SDK library next to the executable so it loads at runtime.
 add_custom_command(TARGET win_desktop_demo POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
     "$<TARGET_FILE:gracia::sdk>" "$<TARGET_FILE_DIR:win_desktop_demo>"
-  COMMENT "Copying gracia_sdk.dll next to the demo executable")
+  COMMENT "Copying the SDK library next to the demo executable")

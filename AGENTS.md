@@ -12,7 +12,7 @@ every rule below: [`examples/win-desktop-demo`](examples/win-desktop-demo/) on a
 
 The SDK is a prebuilt binary in `artifacts/windows.zip`, `artifacts/android.zip` and
 `artifacts/linux.zip`: a C ABI (`gracia/SDK.h`) and a header-only C++ wrapper (`gracia/SDK.hpp`). On
-Windows, Android and Linux the SDK renders with Vulkan. The two examples are Windows only.
+Windows, Android and Linux the SDK renders with Vulkan. The two examples run on Windows and Linux.
 
 Correct a playback defect in the player, not in the SDK. The SDK core and the video loader are shared
 with the Apple SDK and the Python SDK, and both are validated there. The Mac viewer

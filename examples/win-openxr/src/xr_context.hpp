@@ -2,9 +2,6 @@
 
 // Include order matters: openxr_platform.h declares none of its own
 // prerequisites and needs the Vulkan types in scope.
-#include <windows.h>
-#include <unknwn.h>
-
 #include <gracia_demo/frame_ring.hpp>
 #include <gracia_demo/vk_common.hpp>
 
