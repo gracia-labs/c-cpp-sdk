@@ -2,9 +2,6 @@
 
 // Include order matters: openxr_platform.h declares none of its own
 // prerequisites and needs the Vulkan types in scope.
-#include <windows.h>
-#include <unknwn.h>
-
 #include <gracia_demo/frame_ring.hpp>
 #include <gracia_demo/vk_common.hpp>
 
@@ -52,7 +49,7 @@ class XrContext {
   void shutdown();
 
   gvk::Gpu gpu() const {
-    return {vkInstance_, physicalDevice_, device_, pipelineCache_, queues_};
+    return {vkInstance_, physicalDevice_, device_, queues_};
   }
   VkFormat viewFormat() const { return viewFormat_; }
   // Always matches the render pass attachment and the XR swapchain format.
@@ -119,7 +116,6 @@ class XrContext {
   VkInstance vkInstance_ = VK_NULL_HANDLE;
   VkPhysicalDevice physicalDevice_ = VK_NULL_HANDLE;
   VkDevice device_ = VK_NULL_HANDLE;
-  VkPipelineCache pipelineCache_ = VK_NULL_HANDLE;
   gvk::QueueFamilies queues_;
   VkQueue graphicsQueue_ = VK_NULL_HANDLE;  // shared: SDK submits + XR runtime
 

@@ -2,7 +2,7 @@
 
 The shared core of the example viewers. It is platform agnostic on purpose: no
 window system, no OpenXR, no UI toolkit. Both
-[win-desktop-demo](../win-desktop-demo/) and [win-openxr](../win-openxr/) link it
+[desktop_viewer](../desktop_viewer/) and [xr_viewer](../xr_viewer/) link it
 as `gracia_demo_common`.
 
 The split is by dependency, not by convenience. Everything here needs only the

@@ -34,7 +34,7 @@ CPMAddPackage(
 add_library(volk STATIC "${volk_SOURCE_DIR}/volk.c")
 target_include_directories(volk PUBLIC "${volk_SOURCE_DIR}")
 target_link_libraries(volk PUBLIC Vulkan::Headers)
-target_compile_definitions(volk PUBLIC VK_NO_PROTOTYPES VK_USE_PLATFORM_WIN32_KHR)
+target_compile_definitions(volk PUBLIC VK_NO_PROTOTYPES)
 
 # --- The shared viewer core ---------------------------------------------------
 # Platform agnostic on purpose: no window system, no OpenXR, no UI toolkit. It
@@ -59,7 +59,6 @@ target_link_libraries(gracia_demo_common PUBLIC
 
 target_compile_definitions(gracia_demo_common PUBLIC
   VK_NO_PROTOTYPES
-  VK_USE_PLATFORM_WIN32_KHR
   NOMINMAX
   WIN32_LEAN_AND_MEAN
   GLM_FORCE_DEPTH_ZERO_TO_ONE

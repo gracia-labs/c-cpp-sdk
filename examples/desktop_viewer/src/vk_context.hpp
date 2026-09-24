@@ -30,7 +30,7 @@ class VulkanContext {
   void shutdown();
 
   gvk::Gpu gpu() const {
-    return {instance_, physicalDevice_, device_, pipelineCache_, queues_};
+    return {instance_, physicalDevice_, device_, queues_};
   }
   VkQueue graphicsQueue() const { return graphicsQueue_; }
   VkFormat colorFormat() const { return colorFormat_; }
@@ -62,7 +62,6 @@ class VulkanContext {
   VkSurfaceKHR surface_ = VK_NULL_HANDLE;
   VkPhysicalDevice physicalDevice_ = VK_NULL_HANDLE;
   VkDevice device_ = VK_NULL_HANDLE;
-  VkPipelineCache pipelineCache_ = VK_NULL_HANDLE;
 
   gvk::QueueFamilies queues_;
   VkQueue graphicsQueue_ = VK_NULL_HANDLE;  // shared: SDK graphics + our present

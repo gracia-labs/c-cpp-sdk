@@ -7,19 +7,17 @@
 
 #include <GLFW/glfw3.h>
 
-#include <windows.h>
-#include <commdlg.h>
-#define GLFW_EXPOSE_NATIVE_WIN32
-#include <GLFW/glfw3native.h>
+#include <portable-file-dialogs.h>
 
 #include <atomic>
 #include <cstdio>
-#include <cstring>
 #include <filesystem>
 #include <string>
 #include <vector>
 
 #if defined(_WIN32)
+#include <windows.h>
+
 // Favor the high performance NVIDIA or AMD GPUs. Must live in the executable:
 // the linker can drop an unreferenced object out of a static library.
 extern "C" {
@@ -37,12 +35,14 @@ namespace {
 // waits on a fence that nothing is left alive to signal.
 std::atomic<bool> gQuit{false};
 
+#if defined(_WIN32)
 BOOL WINAPI onConsoleCtrl(DWORD type) {
   if (type != CTRL_C_EVENT && type != CTRL_BREAK_EVENT && type != CTRL_CLOSE_EVENT)
     return FALSE;
   gQuit.store(true, std::memory_order_relaxed);
   return TRUE;
 }
+#endif
 
 struct AppState {
   SplatViewer* viewer = nullptr;
@@ -137,34 +137,26 @@ void onKey(GLFWwindow* w, int key, int, int action, int mods) {
   }
 }
 
+// GLFW and the dialog hand out UTF-8; a plain char path is the ANSI code page on Windows.
+std::filesystem::path utf8Path(const std::string& s) {
+  return std::u8string(s.begin(), s.end());
+}
+
 void onDrop(GLFWwindow* w, int count, const char** paths) {
   AppState& a = app(w);
   a.pendingLoad.clear();
-  for (int i = 0; i < count; ++i) a.pendingLoad.emplace_back(paths[i]);
+  for (int i = 0; i < count; ++i) a.pendingLoad.push_back(utf8Path(paths[i]));
 }
 
-// Native multi-select open dialog.
-std::vector<std::filesystem::path> openFileDialog(GLFWwindow* w) {
+// Native multi-select open dialog: Win32 on Windows, zenity or kdialog on Linux.
+std::vector<std::filesystem::path> openFileDialog() {
   std::vector<std::filesystem::path> out;
-  std::vector<wchar_t> buffer(16384, 0);
-  OPENFILENAMEW ofn{};
-  ofn.lStructSize = sizeof(ofn);
-  ofn.hwndOwner = glfwGetWin32Window(w);
-  ofn.lpstrFilter = L"Gracia scenes\0*.ply;*.sog;*.guf;*.mint\0All files\0*.*\0\0";
-  ofn.lpstrFile = buffer.data();
-  ofn.nMaxFile = (DWORD)buffer.size();
-  ofn.lpstrTitle = L"Open one or more .ply, .sog, .guf or .mint scenes";
-  ofn.Flags = OFN_EXPLORER | OFN_ALLOWMULTISELECT | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
-  if (!GetOpenFileNameW(&ofn)) return out;
-
-  const std::wstring dir = buffer.data();
-  wchar_t* p = buffer.data() + dir.size() + 1;
-  if (*p == 0) {
-    out.emplace_back(dir);  // single selection: `dir` is the full path
-  } else {
-    for (; *p; p += std::wcslen(p) + 1)
-      out.emplace_back(std::filesystem::path(dir) / p);
-  }
+  for (const std::string& file :
+       pfd::open_file("Open one or more .ply, .sog, .guf or .mint scenes", "",
+                      {"Gracia scenes", "*.ply *.sog *.guf *.mint", "All files", "*"},
+                      pfd::opt::multiselect)
+           .result())
+    out.push_back(utf8Path(file));
   return out;
 }
 
@@ -182,12 +174,11 @@ VkDescriptorPool createImGuiPool(VkDevice device) {
 
 // --- UI ---------------------------------------------------------------------
 
-void drawMenuBar(GLFWwindow* window, SplatViewer& viewer, bool& openStream,
-                 bool& openFlag) {
+void drawMenuBar(SplatViewer& viewer, bool& openStream, bool& openFlag) {
   if (!ImGui::BeginMainMenuBar()) return;
   if (ImGui::BeginMenu("File")) {
     if (ImGui::MenuItem("Open…", "Ctrl+O")) {
-      auto paths = openFileDialog(window);
+      auto paths = openFileDialog();
       if (!paths.empty())
         viewer.loadScenes(paths, paths.size() > 1 ? SceneLayout::Split
                                                   : SceneLayout::Mix);
@@ -389,7 +380,9 @@ Options parseArgs(int argc, char** argv) {
 }  // namespace
 
 int main(int argc, char** argv) {
+#if defined(_WIN32)
   SetConsoleCtrlHandler(onConsoleCtrl, TRUE);
+#endif
   const Options opts = parseArgs(argc, argv);
 
   if (!glfwInit()) {
@@ -413,7 +406,7 @@ int main(int argc, char** argv) {
 
   auto viewer = std::make_unique<SplatViewer>(ctx);
   if (!viewer->player().initSdk(
-          ctx.gpu(), std::filesystem::temp_directory_path() / "gracia_test_cache")) {
+          ctx.gpu(), std::filesystem::temp_directory_path() / TARGET_NAME "_vulkan_cache")) {
     std::fprintf(stderr, "SDK init failed: %s\n", viewer->player().lastError().c_str());
     viewer.reset();
     ctx.shutdown();
@@ -463,7 +456,6 @@ int main(int argc, char** argv) {
   init.Device = gpu.device;
   init.QueueFamily = gpu.queues.graphics;
   init.Queue = ctx.graphicsQueue();
-  init.PipelineCache = gpu.pipelineCache;
   init.DescriptorPool = imguiPool;
   const VkFormat imguiColorFormat = ctx.colorFormat();
   init.UseDynamicRendering = true;
@@ -499,7 +491,7 @@ int main(int argc, char** argv) {
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
-    drawMenuBar(window, *viewer, openStream, openFlag);
+    drawMenuBar(*viewer, openStream, openFlag);
     drawHUD(*viewer, fps);
     drawAppearance(*viewer);
     drawTransport(*viewer);

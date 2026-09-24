@@ -38,7 +38,6 @@ struct Gpu {
   VkInstance instance = VK_NULL_HANDLE;
   VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
   VkDevice device = VK_NULL_HANDLE;
-  VkPipelineCache pipelineCache = VK_NULL_HANDLE;
   QueueFamilies queues;
 };
 
@@ -69,7 +68,6 @@ class DeviceRequest {
   VkDeviceCreateInfo ci_{};
 };
 
-VkPipelineCache createPipelineCache(VkDevice device);
 VkImageView createColorView(VkDevice device, VkImage image, VkFormat format);
 
 // One cleared color attachment through dynamic rendering. begin() takes the

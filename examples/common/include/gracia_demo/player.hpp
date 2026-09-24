@@ -22,8 +22,9 @@ class SplatsPlayer {
   gracia::Context* sdk() const { return sdk_.get(); }
 
   const std::filesystem::path& cacheDir() const { return cacheDir_; }
-  // Deletes the downloaded stream data. Entries the SDK still holds open are
-  // skipped, so clearing while a stream plays leaves that stream's data.
+  // Deletes the downloaded stream data and the pipeline cache. Entries the SDK
+  // still holds open are skipped, so clearing while a stream plays leaves that
+  // stream's data.
   size_t clearCache();
 
   bool loadScenes(const std::vector<std::filesystem::path>& paths);
