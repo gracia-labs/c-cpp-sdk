@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(win_desktop_demo LANGUAGES C CXX)
+project(desktop_viewer LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -33,6 +33,16 @@ CPMAddPackage(
   DOWNLOAD_ONLY YES
 )
 
+# One header: Win32 dialogs on Windows, zenity or kdialog on Linux. Its own
+# CMakeLists asks for a CMake older than 3.5, so only the header is used.
+CPMAddPackage(
+  NAME portable_file_dialogs
+  URL "file://${SDK_ROOT}/deps/portable-file-dialogs-c12ea8c.zip"
+  DOWNLOAD_ONLY YES
+)
+add_library(portable_file_dialogs INTERFACE)
+target_include_directories(portable_file_dialogs INTERFACE "${portable_file_dialogs_SOURCE_DIR}")
+
 # --- Dear ImGui (core + GLFW/Vulkan backends) ---------------------------------
 add_library(imgui STATIC
   "${imgui_SOURCE_DIR}/imgui.cpp"
@@ -50,30 +60,34 @@ target_compile_definitions(imgui PUBLIC
   VK_NO_PROTOTYPES IMGUI_IMPL_VULKAN_NO_PROTOTYPES)
 
 # --- The demo executable ------------------------------------------------------
-add_executable(win_desktop_demo
+add_executable(desktop_viewer
   src/main.cpp
   src/vk_context.cpp
   src/splat_viewer.cpp
   src/camera.cpp
 )
 
-target_link_libraries(win_desktop_demo PRIVATE
+target_link_libraries(desktop_viewer PRIVATE
   gracia_demo_common
   imgui
   glfw
-  comdlg32
+  portable_file_dialogs
 )
 
-target_compile_definitions(win_desktop_demo PRIVATE
+target_compile_definitions(desktop_viewer PRIVATE
   IMGUI_IMPL_VULKAN_NO_PROTOTYPES
   GLFW_INCLUDE_NONE
+  TARGET_NAME="$<TARGET_PROPERTY:NAME>"
 )
 
-set_target_properties(win_desktop_demo PROPERTIES
-  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+# On Linux the executable finds libgracia_sdk.so next to itself, like the DLL.
+set_target_properties(desktop_viewer PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+  BUILD_WITH_INSTALL_RPATH ON
+  INSTALL_RPATH "$ORIGIN")
 
-# Put gracia_sdk.dll next to the executable so it loads at runtime.
-add_custom_command(TARGET win_desktop_demo POST_BUILD
+# Put the SDK library next to the executable so it loads at runtime.
+add_custom_command(TARGET desktop_viewer POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    "$<TARGET_FILE:gracia::sdk>" "$<TARGET_FILE_DIR:win_desktop_demo>"
-  COMMENT "Copying gracia_sdk.dll next to the demo executable")
+    "$<TARGET_FILE:gracia::sdk>" "$<TARGET_FILE_DIR:desktop_viewer>"
+  COMMENT "Copying the SDK library next to the demo executable")

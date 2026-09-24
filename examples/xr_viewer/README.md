@@ -1,7 +1,7 @@
-# win-openxr
+# xr_viewer
 
 A stereo headset viewer for Gracia scenes. It uses **OpenXR** and **Vulkan**. It
-is the same SDK orchestration as [win-desktop-demo](../win-desktop-demo/), with
+is the same SDK orchestration as [desktop_viewer](../desktop_viewer/), with
 the window, the swapchain and the present loop replaced by an OpenXR session.
 Put the headset on, and the scene stands in front of you.
 
@@ -28,7 +28,7 @@ From the SDK root (`public/c-cpp-sdk`):
 
 ```sh
 cmake -S . -B build
-cmake --build build --config Release --target win_openxr_demo
+cmake --build build --config Release --target xr_viewer
 ```
 
 The first configure downloads the OpenXR loader with CPM, together with GLM, the
@@ -40,7 +40,7 @@ loader is static, so there is no second DLL to copy. The build puts
 ## Run
 
 ```sh
-win_openxr_demo.exe <scene.ply|.sog|.guf|.mint> [more scenes ...] [options]
+xr_viewer.exe <scene.ply|.sog|.guf|.mint> [more scenes ...] [options]
 ```
 
 | Option | Effect |

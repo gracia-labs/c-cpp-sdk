@@ -1,6 +1,6 @@
-# win-desktop-demo
+# desktop_viewer
 
-A Windows desktop viewer for Gracia scenes. The viewer uses **Vulkan** and **Dear
+A Windows and Linux desktop viewer for Gracia scenes. The viewer uses **Vulkan** and **Dear
 ImGui**. It is the C/C++ counterpart to the Mac viewer of the Apple SDK. Open one
 or more scenes, orbit or fly around them, play volumetric video, and adjust the
 look of each scene.
@@ -86,7 +86,7 @@ executable goes into a subfolder for the configuration, for example
 ## Run
 
 ```sh
-win_desktop_demo.exe [scene ...] [options]
+desktop_viewer.exe [scene ...] [options]
 ```
 
 Pass one or more scene files. Or start with none, and **drag and drop** files

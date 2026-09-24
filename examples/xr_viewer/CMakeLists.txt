@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(win_openxr_demo LANGUAGES C CXX)
+project(xr_viewer LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -29,27 +29,30 @@ CPMAddPackage(
 )
 
 # --- The demo executable ------------------------------------------------------
-add_executable(win_openxr_demo
+add_executable(xr_viewer
   src/main.cpp
   src/xr_context.cpp
   src/xr_viewer.cpp
 )
 
-target_link_libraries(win_openxr_demo PRIVATE
+target_link_libraries(xr_viewer PRIVATE
   gracia_demo_common
   openxr_loader
 )
 
-target_compile_definitions(win_openxr_demo PRIVATE
+target_compile_definitions(xr_viewer PRIVATE
   XR_USE_GRAPHICS_API_VULKAN
-  XR_USE_PLATFORM_WIN32
+  TARGET_NAME="$<TARGET_PROPERTY:NAME>"
 )
 
-set_target_properties(win_openxr_demo PROPERTIES
-  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+# On Linux the executable finds libgracia_sdk.so next to itself, like the DLL.
+set_target_properties(xr_viewer PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+  BUILD_WITH_INSTALL_RPATH ON
+  INSTALL_RPATH "$ORIGIN")
 
-# Put gracia_sdk.dll next to the executable so it loads at runtime.
-add_custom_command(TARGET win_openxr_demo POST_BUILD
+# Put the SDK library next to the executable so it loads at runtime.
+add_custom_command(TARGET xr_viewer POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    "$<TARGET_FILE:gracia::sdk>" "$<TARGET_FILE_DIR:win_openxr_demo>"
-  COMMENT "Copying gracia_sdk.dll next to the demo executable")
+    "$<TARGET_FILE:gracia::sdk>" "$<TARGET_FILE_DIR:xr_viewer>"
+  COMMENT "Copying the SDK library next to the demo executable")

@@ -15,10 +15,10 @@ option(GRACIA_BUILD_EXAMPLES "Build the Gracia C/C++ SDK examples" ON)
 
 # --- Prebuilt SDK archive ------------------------------------------------------
 # The archive that matches the target platform:
-#   artifacts/windows.zip          artifacts/android.zip (arm64-v8a)
-#     include/gracia/SDK.h           include/gracia/SDK.h
-#     include/gracia/SDK.hpp         include/gracia/SDK.hpp
-#     gracia_sdk.dll                 libgracia_sdk.so
+#   artifacts/windows.zip     artifacts/android.zip (arm64-v8a)   artifacts/linux.zip (x86_64)
+#     include/gracia/SDK.h      include/gracia/SDK.h                include/gracia/SDK.h
+#     include/gracia/SDK.hpp    include/gracia/SDK.hpp              include/gracia/SDK.hpp
+#     gracia_sdk.dll            libgracia_sdk.so                    libgracia_sdk.so
 #     gracia_sdk.lib
 if(ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "Android")
   set(GRACIA_SDK_PLATFORM android)
@@ -28,11 +28,15 @@ elseif(WIN32)
   set(GRACIA_SDK_PLATFORM windows)
   set(GRACIA_SDK_LIBRARY gracia_sdk.dll)
   set(GRACIA_SDK_IMPLIB gracia_sdk.lib)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|amd64)$")
+  set(GRACIA_SDK_PLATFORM linux)
+  set(GRACIA_SDK_LIBRARY libgracia_sdk.so)
+  set(GRACIA_SDK_IMPLIB "")
 else()
   message(WARNING
     "Gracia C/C++ SDK: this package ships prebuilt binaries for Windows "
-    "(windows.zip) and Android arm64-v8a (android.zip). Configuring for another "
-    "platform only exposes the sources.")
+    "(windows.zip), Android arm64-v8a (android.zip) and Linux x86_64 (linux.zip). "
+    "Configuring for another platform only exposes the sources.")
   return()
 endif()
 
@@ -69,12 +73,12 @@ if(GRACIA_SDK_IMPLIB)
     IMPORTED_IMPLIB "${GRACIA_SDK_DIR}/${GRACIA_SDK_IMPLIB}")
 endif()
 
-# The examples are Windows only: they use a Win32 surface, a desktop OpenXR
-# runtime and GLFW. On Android link gracia::sdk from your own build.
-if(GRACIA_BUILD_EXAMPLES AND WIN32)
+# The examples run on Windows and Linux: GLFW gives the window and a desktop
+# OpenXR runtime the headset. On Android link gracia::sdk from your own build.
+if(GRACIA_BUILD_EXAMPLES AND GRACIA_SDK_PLATFORM MATCHES "^(windows|linux)$")
   add_subdirectory(examples/common)   # shared viewer core, used by both examples
-  add_subdirectory(examples/win-desktop-demo)
-  add_subdirectory(examples/win-openxr)
+  add_subdirectory(examples/desktop_viewer)
+  add_subdirectory(examples/xr_viewer)
 elseif(GRACIA_BUILD_EXAMPLES)
-  message(STATUS "Gracia SDK: the examples are Windows only; skipped.")
+  message(STATUS "Gracia SDK: the examples are Windows and Linux only; skipped.")
 endif()

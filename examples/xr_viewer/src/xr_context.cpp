@@ -15,7 +15,6 @@ bool XrContext::init(const char* appName) {
   if (!loadXrExtensionFns()) return false;
   if (!getSystem()) return false;
   if (!createVulkan()) return false;
-  pipelineCache_ = gvk::createPipelineCache(device_);
   if (!createSession()) return false;
   if (!createSwapchains()) return false;
   createEyeViews();
@@ -481,8 +480,6 @@ void XrContext::shutdown() {
     eye.swapchain = XR_NULL_HANDLE;
   }
   frames_.destroy(device_);
-  if (pipelineCache_) vkDestroyPipelineCache(device_, pipelineCache_, nullptr);
-  pipelineCache_ = VK_NULL_HANDLE;
 
   if (appSpace_) xrDestroySpace(appSpace_);
   if (session_) xrDestroySession(session_);

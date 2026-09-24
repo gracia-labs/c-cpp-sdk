@@ -2,22 +2,22 @@
 
 This file explains how to write a video player with the Gracia C/C++ SDK.
 [`README.md`](README.md) is the reference for the build. There are two worked examples, and both obey
-every rule below: [`examples/win-desktop-demo`](examples/win-desktop-demo/) on a window, and
-[`examples/win-openxr`](examples/win-openxr/) on a headset.
+every rule below: [`examples/desktop_viewer`](examples/desktop_viewer/) on a window, and
+[`examples/xr_viewer`](examples/xr_viewer/) on a headset.
 
 > Write docs in Simplified Technical English (ASD-STE100): short active sentences, present tense, no
 > gerund verbs, no contractions.
 
 ## Orientation
 
-The SDK is a prebuilt binary in `artifacts/windows.zip` and `artifacts/android.zip`: a C ABI
-(`gracia/SDK.h`) and a header-only C++ wrapper (`gracia/SDK.hpp`). On Windows and on Android the SDK
-renders with Vulkan. The two examples are Windows only.
+The SDK is a prebuilt binary in `artifacts/windows.zip`, `artifacts/android.zip` and
+`artifacts/linux.zip`: a C ABI (`gracia/SDK.h`) and a header-only C++ wrapper (`gracia/SDK.hpp`). On
+Windows, Android and Linux the SDK renders with Vulkan. The two examples run on Windows and Linux.
 
 Correct a playback defect in the player, not in the SDK. The SDK core and the video loader are shared
 with the Apple SDK and the Python SDK, and both are validated there. The Mac viewer
-(`public/apple-sdk/Sources/GraciaView/SplatsSceneView.swift`) is the reference player. The Windows
-demo is a port of it.
+(`public/apple-sdk/Sources/GraciaView/SplatsSceneView.swift`) is the reference player. The desktop
+viewer is a port of it.
 
 Both examples link [`examples/common`](examples/common/), which holds the Vulkan device setup, the
 frame ring, the scenes and the playback clock. The clock rules below have exactly one implementation,
@@ -52,8 +52,9 @@ Your application creates the device; the SDK never does.
 [`README.md`](README.md#vulkan-device-requirements) lists what it must carry, and
 `gvk::DeviceRequest` in [`examples/common`](examples/common/src/vk_common.cpp) builds it.
 
-- Enable `VK_KHR_dynamic_rendering` and `VK_KHR_synchronization2` as extensions. The SDK calls
-  the `KHR` entry points, and the promoted core 1.3 ones do not fill those slots.
+- Enable `VK_KHR_dynamic_rendering`, `VK_KHR_synchronization2` and `VK_KHR_push_descriptor` as
+  extensions. The SDK calls the `KHR` entry points, and the promoted core ones do not fill those
+  slots.
 - Read the supported feature chain and pass the same chain to `vkCreateDevice`.
 - `gracia_context_create()` returns null on a device that is short. It is not a crash and not an
   exception, so check the return value.
@@ -82,7 +83,7 @@ one; the SDK serves both, and it keys its pipeline cache on that handle. Either 
 
 ## Frames and lifetime
 
-13. Keep the draw calls of a frame until the GPU completes that frame. The demo holds one `FrameDraws`
+13. Keep the draw calls of a frame until the GPU completes that frame. The desktop viewer holds one `FrameDraws`
     for each in-flight slot, and it clears a slot only after the fence of that slot signals.
 14. Use a maximum of three frames at a time. It matches the per-frame ring depth of the SDK.
 15. Submit and present on the queue that the SDK tracks: the graphics family, index 0. Another queue
@@ -107,7 +108,7 @@ one; the SDK serves both, and it keys its pipeline cache on that handle. Either 
     and differs between the eyes. A symmetric projection from the aspect ratio looks correct on a
     monitor and is wrong in a headset.
 21. Give the SDK the camera-to-world transform of each eye, straight from `XrPosef`. Do not invert
-    it: the SDK inverts it. OpenXR and the demo camera share a convention, so no axis changes.
+    it: the SDK inverts it. OpenXR and the desktop viewer camera share a convention, so no axis changes.
 22. Let OpenXR pick the GPU with `xrGetVulkanGraphicsDevice2KHR`, and create the Vulkan instance and
     the device through `xrCreateVulkanInstanceKHR` and `xrCreateVulkanDeviceKHR`. Check the
     `XrResult` **and** the `vulkanResult` output: a success with a failed `vulkanResult` gives a null
@@ -148,11 +149,11 @@ one; the SDK serves both, and it keys its pipeline cache on that handle. Either 
 
 ## Verify a change
 
-There is no automated test for the player. Build the demo, then run it against a `.mint`:
+There is no automated test for the player. Build the desktop viewer, then run it against a `.mint`:
 
 ```sh
-cmake --build build --config Release --target win_desktop_demo
-build/bin/Release/win_desktop_demo.exe scene.mint
+cmake --build build --config Release --target desktop_viewer
+build/bin/Release/desktop_viewer.exe scene.mint
 ```
 
 Test a rewind with the scrub bar, a loop at the end of the clip, and both layouts
@@ -163,8 +164,8 @@ it renders the Vulkan path correctly, so no hardware is needed to test a change.
 a headset the viewer waits 10 seconds and exits with a message.
 
 ```sh
-cmake --build build --config Release --target win_openxr_demo
-build/bin/Release/win_openxr_demo.exe scene.mint
+cmake --build build --config Release --target xr_viewer
+build/bin/Release/xr_viewer.exe scene.mint
 ```
 
 Look through the headset with one eye closed at a time: a stereo fault (rule 18) is invisible with

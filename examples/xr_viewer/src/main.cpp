@@ -12,6 +12,8 @@
 #include <vector>
 
 #if defined(_WIN32)
+#include <windows.h>
+
 // Favor the high performance NVIDIA or AMD GPUs. Must live in the executable:
 // the linker can drop an unreferenced object out of a static library.
 extern "C" {
@@ -29,12 +31,14 @@ namespace {
 // waits on a fence that nothing is left alive to signal.
 std::atomic<bool> gQuit{false};
 
+#if defined(_WIN32)
 BOOL WINAPI onConsoleCtrl(DWORD type) {
   if (type != CTRL_C_EVENT && type != CTRL_BREAK_EVENT && type != CTRL_CLOSE_EVENT)
     return FALSE;
   gQuit.store(true, std::memory_order_relaxed);
   return TRUE;
 }
+#endif
 
 struct Options {
   std::vector<std::filesystem::path> scenes;
@@ -62,7 +66,7 @@ Options parseArgs(int argc, char** argv) {
 
 void usage() {
   std::printf(
-      "usage: win_openxr_demo <scene.ply|.sog|.guf|.mint> [more scenes ...]\n"
+      "usage: xr_viewer <scene.ply|.sog|.guf|.mint> [more scenes ...]\n"
       "       [--stream <url>] [--token <t>] [--seek <s>]\n"
       "       [--scale <m>] [--distance <m>] [--height <m>]\n");
 }
@@ -72,7 +76,9 @@ void usage() {
 int main(int argc, char** argv) {
   // An XR runtime can leave buffered stdout unflushed at exit.
   setvbuf(stdout, nullptr, _IONBF, 0);
+#if defined(_WIN32)
   SetConsoleCtrlHandler(onConsoleCtrl, TRUE);
+#endif
 
   const Options opts = parseArgs(argc, argv);
   if (opts.scenes.empty() && opts.stream.empty()) {
@@ -86,7 +92,7 @@ int main(int argc, char** argv) {
 
   XrViewer viewer;
   if (!viewer.player().initSdk(
-          xr.gpu(), std::filesystem::temp_directory_path() / "gracia_test_cache") ||
+          xr.gpu(), std::filesystem::temp_directory_path() / TARGET_NAME "_vulkan_cache") ||
       !viewer.load(xr, opts.scenes, opts.stream, opts.token)) {
     std::fprintf(stderr, "Failed: %s\n", viewer.player().lastError().c_str());
     viewer.shutdown();

@@ -51,11 +51,12 @@ DeviceRequest::DeviceRequest(VkPhysicalDevice gpu, const QueueFamilies& families
   available_.resize(availCount);
   vkEnumerateDeviceExtensionProperties(gpu, nullptr, &availCount, available_.data());
 
-  // The SDK resolves these two by their KHR names, so the promoted core
+  // The SDK resolves these by their KHR names, so the promoted core
   // versions alone are not enough. Everything else it uses is a feature below.
   static const char* const kWanted[] = {
       VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
       VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
+      VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
   };
   if (wantSwapchain && has(VK_KHR_SWAPCHAIN_EXTENSION_NAME))
     extensions_.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
@@ -83,13 +84,6 @@ bool DeviceRequest::has(const char* name) const {
   for (const auto& e : available_)
     if (std::strcmp(e.extensionName, name) == 0) return true;
   return false;
-}
-
-VkPipelineCache createPipelineCache(VkDevice device) {
-  VkPipelineCacheCreateInfo pci{VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO};
-  VkPipelineCache cache = VK_NULL_HANDLE;
-  VK_CHECK(vkCreatePipelineCache(device, &pci, nullptr, &cache));
-  return cache;
 }
 
 VkImageView createColorView(VkDevice device, VkImage image, VkFormat format) {

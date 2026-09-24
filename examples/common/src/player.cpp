@@ -24,7 +24,6 @@ bool SplatsPlayer::initSdk(const gvk::Gpu& gpu,
   desc.instance = gpu.instance;
   desc.physicalDevice = gpu.physicalDevice;
   desc.device = gpu.device;
-  desc.pipelineCache = gpu.pipelineCache;
   desc.graphicsQueueFamilyIndex = gpu.queues.graphics;
   desc.computeQueueFamilyIndex = gpu.queues.compute;
   desc.transferQueueFamilyIndex = gpu.queues.transfer;

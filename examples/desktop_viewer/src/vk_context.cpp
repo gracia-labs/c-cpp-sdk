@@ -2,10 +2,6 @@
 
 #include <GLFW/glfw3.h>
 
-#include <windows.h>
-#define GLFW_EXPOSE_NATIVE_WIN32
-#include <GLFW/glfw3native.h>
-
 #include <algorithm>
 
 namespace {
@@ -33,7 +29,6 @@ bool VulkanContext::init(GLFWwindow* window, const char* appName) {
   if (!createInstance(window, appName)) return false;
   if (!pickPhysicalDevice()) return false;
   if (!createDevice()) return false;
-  pipelineCache_ = gvk::createPipelineCache(device_);
   createSwapchain();
   frames_.init(device_, queues_.graphics, kFramesInFlight);
 
@@ -64,10 +59,7 @@ bool VulkanContext::createInstance(GLFWwindow* window, const char* appName) {
   VK_CHECK(vkCreateInstance(&ci, nullptr, &instance_));
   volkLoadInstanceOnly(instance_);
 
-  VkWin32SurfaceCreateInfoKHR sci{VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR};
-  sci.hinstance = GetModuleHandle(nullptr);
-  sci.hwnd = glfwGetWin32Window(window);
-  VK_CHECK(vkCreateWin32SurfaceKHR(instance_, &sci, nullptr, &surface_));
+  VK_CHECK(glfwCreateWindowSurface(instance_, window, nullptr, &surface_));
   return true;
 }
 
@@ -287,7 +279,6 @@ void VulkanContext::shutdown() {
   for (auto s : imageAvailable_) vkDestroySemaphore(device_, s, nullptr);
   imageAvailable_.clear();
   frames_.destroy(device_);
-  if (pipelineCache_) vkDestroyPipelineCache(device_, pipelineCache_, nullptr);
   vkDestroyDevice(device_, nullptr);
   if (surface_) vkDestroySurfaceKHR(instance_, surface_, nullptr);
   if (instance_) vkDestroyInstance(instance_, nullptr);
