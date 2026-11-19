@@ -14,7 +14,7 @@ include/gracia_demo/
   vk_common.hpp     Queue families, device create info, render pass, barriers
   frame_ring.hpp    Command buffers and fences for the frames in flight
   player.hpp        SDK context, scenes and the playback clock
-  scene.hpp         Scene + SceneGroup (static or MINT, late-settling metadata)
+  scene.hpp         Scene + SceneGroup (static, MINT or GRV, late metadata)
   math3d.hpp        Bounding box helpers
 ```
 
@@ -37,8 +37,9 @@ tracks.
 **`player`** owns the SDK context, the scenes and the playback clock. The clock
 rules are in [../../AGENTS.md](../../AGENTS.md), and this is the only copy of
 them: the client owns the clock, it steps on `dt` alone, and it parks only for a
-scrub or while a scene buffers. A viewer feeds it `setBuffering()` from the draw
-calls of the frame and reads the transport state back.
+scrub or while a scene buffers. It sets the speed of the sound from the same
+clock. A viewer feeds it `setBuffering()` from the draw calls of the frame and
+`setListener()` from its camera, and reads the transport state back.
 
 ## Adding to it
 

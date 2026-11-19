@@ -49,9 +49,14 @@ class SceneCamera {
   void setReverseZ(bool r) { reverseZ_ = r; }
 
   // `adaptive` is what the camera frames/zooms at (strays don't shrink scale);
-  // `full` bounds the far plane. An invalid box un-frames; reposition=false keeps
-  // the current pose (spawn).
-  void setBBox(const BBox& full, const BBox& adaptive, bool reposition = true);
+  // `full` bounds the far plane. `pivot` is the point the camera frames and turns
+  // about, as a .grv states it; with none, the centre of `adaptive`. An invalid box
+  // un-frames; reposition=false keeps the current pose (spawn).
+  void setBBox(const BBox& full, const BBox& adaptive,
+               std::optional<glm::vec3> pivot, bool reposition = true);
+  // Puts the camera at `eye` with a full orientation, roll included; reset()
+  // comes back to it. It reads nothing from the box.
+  void place(const glm::vec3& eye, const glm::quat& orientation);
   void reset();
   bool isFramed() const { return framed_; }
 
@@ -71,8 +76,9 @@ class SceneCamera {
   float reach() const;
   float flySpeed() const { return sceneRadius_ / 4.5f * flyTrim_; }
 
-  void frameScene(const BBox& full, const BBox& subject, bool reposition);
-  void pose(const glm::vec3& target, const glm::vec3& eye);
+  void frameScene(const BBox& full, const BBox& subject, const glm::vec3& centre,
+                  bool reposition);
+  void pose(const glm::vec3& eye, const glm::quat& orient);
   void turn(float dx, float dy);
   void dolly(float amount);
   void pan(float px, float py);
@@ -90,7 +96,7 @@ class SceneCamera {
   float fullRadius_ = 12.0f;
   float flyTrim_ = 1.0f;
   bool framed_ = false;
-  std::optional<std::pair<glm::vec3, glm::vec3>> framing_;  // (target, eye)
+  std::optional<std::pair<glm::vec3, glm::quat>> framing_;  // (eye, orientation)
 
   float fov_ = 60.0f, aspect_ = 1.0f, near_ = 0.05f, far_ = 10000.0f;
   bool reverseZ_ = true;

@@ -28,11 +28,16 @@ class SplatsPlayer {
   size_t clearCache();
 
   bool loadScenes(const std::vector<std::filesystem::path>& paths);
-  bool loadStream(const std::string& url, const std::string& token);
+  // A MINT with a token or a URL that ends in .mint, else a GRV with `head`.
+  bool loadStream(const std::string& url, const std::string& token,
+                  const std::vector<uint8_t>& head = {});
   void reset();
 
-  // Once per frame, always: pump() is the only network check.
+  // Once per frame, always: pump() is the only network check. It also sets the
+  // speed of the sound: the speed of the clock while it moves, else 0.
   void advance(float dt);
+  // Once per frame: the camera of the frame, in VR the head between the eyes.
+  void setListener(const glm::mat4& cameraToWorld);
   // What the renderer reported for the frame it just built.
   void setBuffering(bool anyBuffering) { renderBuffering_ = anyBuffering; }
   // True once after late metadata settled: rebuild renderers, frame again.
@@ -52,6 +57,9 @@ class SplatsPlayer {
   bool isBuffering() const { return !isReady_ || renderBuffering_; }
   // Held while a scrub bar is dragged: the bar owns the clock then.
   void setScrubbing(bool s) { isScrubbing_ = s; }
+  // The gain of the sound of each video: 1 by default, 0 mutes it.
+  float volume() const { return volume_; }
+  void setVolume(float v);
 
   SceneGroup* group() const { return group_.get(); }
   bool hasScenes() const { return group_ && !group_->empty(); }
@@ -63,6 +71,9 @@ class SplatsPlayer {
 
   void setFlag(const std::string& key, bool value);
   const std::string& lastError() const { return lastError_; }
+  // Why a video plays nothing, while it plays nothing: empty when there is no
+  // such reason.
+  std::string videoProblem() const;
 
  private:
   void install(std::vector<std::unique_ptr<Scene>> scenes);
@@ -74,6 +85,7 @@ class SplatsPlayer {
   double playhead_ = 0;
   bool isPlaying_ = true;
   double playbackSpeed_ = 1.0;
+  float volume_ = 1.0f;
   bool renderBuffering_ = false;
   bool isScrubbing_ = false;
   bool isReady_ = true;

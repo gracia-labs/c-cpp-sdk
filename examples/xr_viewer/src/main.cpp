@@ -43,6 +43,7 @@ BOOL WINAPI onConsoleCtrl(DWORD type) {
 struct Options {
   std::vector<std::filesystem::path> scenes;
   std::string stream, token;
+  std::filesystem::path head;
   double seek = -1.0;
   float scale = 0.75f;     // target scene radius, metres
   float distance = 2.0f;   // in front of the origin, metres
@@ -55,6 +56,7 @@ Options parseArgs(int argc, char** argv) {
     std::string a = argv[i];
     if (a == "--stream" && i + 1 < argc) o.stream = argv[++i];
     else if (a == "--token" && i + 1 < argc) o.token = argv[++i];
+    else if (a == "--head" && i + 1 < argc) o.head = argv[++i];
     else if (a == "--seek" && i + 1 < argc) o.seek = atof(argv[++i]);
     else if (a == "--scale" && i + 1 < argc) o.scale = (float)atof(argv[++i]);
     else if (a == "--distance" && i + 1 < argc) o.distance = (float)atof(argv[++i]);
@@ -66,8 +68,8 @@ Options parseArgs(int argc, char** argv) {
 
 void usage() {
   std::printf(
-      "usage: xr_viewer <scene.ply|.sog|.guf|.mint> [more scenes ...]\n"
-      "       [--stream <url>] [--token <t>] [--seek <s>]\n"
+      "usage: xr_viewer <scene.ply|.sog|.guf|.mint|.grv> [more scenes ...]\n"
+      "       [--stream <url>] [--token <t>] [--head <file>] [--seek <s>]\n"
       "       [--scale <m>] [--distance <m>] [--height <m>]\n");
 }
 
@@ -93,7 +95,8 @@ int main(int argc, char** argv) {
   XrViewer viewer;
   if (!viewer.player().initSdk(
           xr.gpu(), std::filesystem::temp_directory_path() / TARGET_NAME "_vulkan_cache") ||
-      !viewer.load(xr, opts.scenes, opts.stream, opts.token)) {
+      !viewer.load(xr, opts.scenes, opts.stream, opts.token,
+                   opts.head.empty() ? std::vector<uint8_t>{} : readHeadFile(opts.head))) {
     std::fprintf(stderr, "Failed: %s\n", viewer.player().lastError().c_str());
     viewer.shutdown();
     xr.shutdown();

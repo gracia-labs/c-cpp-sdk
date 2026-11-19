@@ -36,6 +36,12 @@ std::pair<float, float> yawPitch(glm::vec3 fwd) {
   return {std::atan2(fwd.x, -fwd.z), std::asin(glm::clamp(fwd.y, -1.0f, 1.0f))};
 }
 
+// Looks along `forward` with world-up and no roll.
+glm::quat facing(glm::vec3 forward) {
+  auto [yaw, pitch] = yawPitch(nrm(forward, glm::vec3(0, 0, -1)));
+  return glm::angleAxis(-yaw, glm::vec3(0, 1, 0)) * glm::angleAxis(pitch, glm::vec3(1, 0, 0));
+}
+
 std::optional<MoveKey> moveKeyFor(int glfwKey) {
   switch (glfwKey) {
     case GLFW_KEY_W: return MoveKey::W;
@@ -103,17 +109,22 @@ float SceneCamera::reach() const {
                     sceneRadius_ * K::kReachCeiling);
 }
 
-void SceneCamera::setBBox(const BBox& full, const BBox& adaptive, bool reposition) {
+void SceneCamera::setBBox(const BBox& full, const BBox& adaptive,
+                          std::optional<glm::vec3> pivot, bool reposition) {
   if (!full.valid()) {
     framed_ = false;
+    // A .grv of sounds alone has no box, and its viewpoint can still place the camera.
+    if (pivot) sceneCentre_ = *pivot;
     return;
   }
-  frameScene(full, adaptive.valid() ? adaptive : full, reposition);
+  const BBox subject = adaptive.valid() ? adaptive : full;
+  frameScene(full, subject, pivot.value_or(subject.center()), reposition);
 }
 
-void SceneCamera::frameScene(const BBox& full, const BBox& subject, bool reposition) {
-  sceneCentre_ = subject.center();
-  const float r = subject.radius();
+void SceneCamera::frameScene(const BBox& full, const BBox& subject,
+                             const glm::vec3& centre, bool reposition) {
+  sceneCentre_ = centre;
+  const float r = subject.radiusAbout(centre);
   sceneRadius_ = (std::isfinite(r) && r > 0) ? r : K::kDefaultRadius;
   fullRadius_ = glm::max(full.radius(), 1e-4f);
   flyTrim_ = 1.0f;
@@ -123,9 +134,15 @@ void SceneCamera::frameScene(const BBox& full, const BBox& subject, bool reposit
   const float halfFovV = fov_ * glm::pi<float>() / 360.0f;
   const float halfFov =
       glm::min(halfFovV, std::atan(std::tan(halfFovV) * glm::max(aspect_, 1e-3f)));
-  const float dist = subject.radius() / std::sin(halfFov) * 1.05f;
-  framing_ = {subject.center(), subject.center() + glm::vec3(0, 0, 1) * glm::max(dist, 1e-3f)};
+  const float dist = sceneRadius_ / std::sin(halfFov) * 1.05f;
+  const glm::vec3 eye = centre + glm::vec3(0, 0, 1) * glm::max(dist, 1e-3f);
+  framing_ = {eye, facing(centre - eye)};
   reset();
+}
+
+void SceneCamera::place(const glm::vec3& eye, const glm::quat& orientation) {
+  framing_ = {eye, glm::normalize(orientation)};
+  pose(framing_->first, framing_->second);
 }
 
 void SceneCamera::reset() {
@@ -134,11 +151,9 @@ void SceneCamera::reset() {
   framed_ = true;
 }
 
-void SceneCamera::pose(const glm::vec3& target, const glm::vec3& eye) {
+void SceneCamera::pose(const glm::vec3& eye, const glm::quat& orient) {
   eye_ = eye;
-  auto [yaw, pitch] = yawPitch(nrm(target - eye, glm::vec3(0, 0, -1)));
-  orient_ = glm::angleAxis(-yaw, glm::vec3(0, 1, 0)) *
-            glm::angleAxis(pitch, glm::vec3(1, 0, 0));
+  orient_ = orient;
   input_.reset();
   apply();
 }

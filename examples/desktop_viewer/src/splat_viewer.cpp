@@ -19,9 +19,10 @@ bool SplatViewer::loadScenes(const std::vector<std::filesystem::path>& paths,
   return afterLoad(layout);
 }
 
-bool SplatViewer::loadStream(const std::string& url, const std::string& token) {
+bool SplatViewer::loadStream(const std::string& url, const std::string& token,
+                             const std::vector<uint8_t>& head) {
   ctx_.waitIdle();
-  if (!player_.loadStream(url, token)) return false;
+  if (!player_.loadStream(url, token, head)) return false;
   return afterLoad(SceneLayout::Mix);
 }
 
@@ -72,16 +73,23 @@ void SplatViewer::setLayout(SceneLayout layout) {
   split_.reset(layout_ == SceneLayout::Split ? (int)player_.sceneCount() : 0);
 }
 
+// Frames the box about the pivot of a .grv, then starts at its display viewpoint.
 void SplatViewer::reframe() {
   SceneGroup* group = player_.group();
   if (!group) return;
   const BBox full = group->boundingBox();
+  const auto pivot = group->pivot();
   if (!full.valid()) {
-    camera_.setBBox(full, full, autoFrames_);
+    camera_.setBBox(full, full, pivot, autoFrames_);
     return;
   }
   const BBox subject = group->adaptiveBBox();
-  camera_.setBBox(full, subject.valid() ? subject : full, autoFrames_);
+  camera_.setBBox(full, subject.valid() ? subject : full, pivot, autoFrames_);
+  const auto viewpoint = group->viewpoint(GRACIA_VIEWPOINT_DISPLAY);
+  if (!autoFrames_ || !viewpoint) return;
+  const float* p = viewpoint->position;
+  const float* q = viewpoint->rotation;  // {x, y, z, w}
+  camera_.place(glm::vec3(p[0], p[1], p[2]), glm::quat(q[3], q[0], q[1], q[2]));
 }
 
 void SplatViewer::applyAppearance() {
@@ -121,6 +129,7 @@ void SplatViewer::prepare(const Frame& frame) {
   const auto& scenes = group->scenes();
   const float aspect = (float)frame.extent.width / (float)frame.extent.height;
   const RenderView view = camera_.renderView(aspect, (float)frame.extent.height);
+  player_.setListener(view.cameraToWorld);
   const uint32_t w = frame.extent.width, h = frame.extent.height;
 
   const GraciaRendererSplatsPass pass =

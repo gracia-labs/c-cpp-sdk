@@ -1,5 +1,7 @@
 #include <gracia_demo/player.hpp>
 
+#include <glm/gtc/type_ptr.hpp>
+
 #include <algorithm>
 #include <system_error>
 
@@ -27,6 +29,8 @@ bool SplatsPlayer::initSdk(const gvk::Gpu& gpu,
   desc.graphicsQueueFamilyIndex = gpu.queues.graphics;
   desc.computeQueueFamilyIndex = gpu.queues.compute;
   desc.transferQueueFamilyIndex = gpu.queues.transfer;
+  // The SDK plays the sound of each .grv on the default playback device.
+  desc.audio.output = GRACIA_AUDIO_OUTPUT_DEVICE;
 
   sdk_ = std::make_unique<gracia::Context>(desc, cacheDir);
   if (!*sdk_) {
@@ -59,13 +63,14 @@ bool SplatsPlayer::loadScenes(const std::vector<std::filesystem::path>& paths) {
   return true;
 }
 
-bool SplatsPlayer::loadStream(const std::string& url, const std::string& token) {
+bool SplatsPlayer::loadStream(const std::string& url, const std::string& token,
+                              const std::vector<uint8_t>& head) {
   lastError_.clear();
   if (!sdk_) {
     lastError_ = "SDK not initialized";
     return false;
   }
-  auto s = Scene::createStream(sdk_.get(), url, token);
+  auto s = Scene::createStream(sdk_.get(), url, token, head);
   if (!s) {
     lastError_ = "failed to open stream";
     return false;
@@ -85,6 +90,7 @@ void SplatsPlayer::install(std::vector<std::unique_ptr<Scene>> scenes) {
   isReady_ = !group_->hasVideo();
   appliedSettle_ = group_->isSettled();
   settledPending_ = false;
+  group_->setVolume(volume_);
   if (group_->duration() > 0) group_->setPlaybackRange(0, group_->duration());
 }
 
@@ -120,11 +126,15 @@ void SplatsPlayer::seek(double t) {
 void SplatsPlayer::advance(float dt) {
   if (group_ && group_->hasVideo()) {
     // Client owns the clock: dt only, parked while scrubbing or buffering.
-    if (isPlaying_ && !isScrubbing_ && !isBuffering() && group_->duration() > 0) {
+    const bool moves =
+        isPlaying_ && !isScrubbing_ && !isBuffering() && group_->duration() > 0;
+    if (moves) {
       playhead_ += dt * playbackSpeed_;
       if (playhead_ >= group_->duration()) playhead_ = 0;
     }
     group_->setTime(playhead_);
+    // The sound follows the clock: it stops while the clock parks.
+    group_->setSpeed(moves ? playbackSpeed_ : 0.0);
     // isReady_ comes from the decoder, not the draw calls: a viewer that skips a
     // frame would never report it and the stream deadlocks. AGENTS.md rule 4.
     isReady_ = group_->pump();
@@ -149,4 +159,27 @@ std::string SplatsPlayer::sceneName(size_t i) const {
 
 void SplatsPlayer::setFlag(const std::string& key, bool value) {
   if (group_) group_->setFlag(key, value);
+}
+
+void SplatsPlayer::setListener(const glm::mat4& cameraToWorld) {
+  if (sdk_) sdk_->setListener(glm::value_ptr(cameraToWorld));
+}
+
+void SplatsPlayer::setVolume(float v) {
+  volume_ = std::clamp(v, 0.0f, 1.0f);
+  if (group_) group_->setVolume(volume_);
+}
+
+std::string SplatsPlayer::videoProblem() const {
+  // A status is only valid after ready() gives false: ready() reads the head.
+  if (!group_ || isReady_) return {};
+  for (const auto& s : group_->scenes()) {
+    switch (s->status()) {
+      case GRACIA_VIDEO_STATUS_FAILED: return s->name() + " does not play";
+      case GRACIA_VIDEO_STATUS_UNSUPPORTED: return s->name() + " needs a newer SDK";
+      case GRACIA_VIDEO_STATUS_HEAD_HASH: return s->name() + " holds a head hash: it opens only with its head";
+      default: break;
+    }
+  }
+  return {};
 }

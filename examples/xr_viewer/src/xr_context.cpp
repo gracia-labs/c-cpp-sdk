@@ -213,6 +213,18 @@ bool XrContext::createSession() {
   rsci.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_LOCAL;
   rsci.poseInReferenceSpace.orientation.w = 1.0f;
   XR_TRY(xrCreateReferenceSpace(session_, &rsci, &appSpace_), "xrCreateReferenceSpace");
+
+  // STAGE is optional: its y = 0 is the floor, which a VR viewpoint stands on.
+  uint32_t spaceCount = 0;
+  xrEnumerateReferenceSpaces(session_, 0, &spaceCount, nullptr);
+  std::vector<XrReferenceSpaceType> spaces(spaceCount);
+  xrEnumerateReferenceSpaces(session_, spaceCount, &spaceCount, spaces.data());
+  for (XrReferenceSpaceType t : spaces) {
+    if (t != XR_REFERENCE_SPACE_TYPE_STAGE) continue;
+    rsci.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
+    if (XR_FAILED(xrCreateReferenceSpace(session_, &rsci, &stageSpace_)))
+      stageSpace_ = XR_NULL_HANDLE;
+  }
   return true;
 }
 
@@ -384,6 +396,12 @@ std::optional<XrFrameCtx> XrContext::acquire(const XrFrameState& fs) {
   f.slot = frames_.slot();
   f.views = views;
   f.eyeExtent = eyeExtent_;
+  if (stageSpace_) {
+    XrSpaceLocation stage{XR_TYPE_SPACE_LOCATION};
+    if (XR_SUCCEEDED(xrLocateSpace(stageSpace_, appSpace_, fs.predictedDisplayTime, &stage)) &&
+        (stage.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT))
+      f.floorY = stage.pose.position.y;
+  }
 
   // The draw calls recorded into this slot are freed by the caller right after
   // this wait, so the GPU must be done with them first.
@@ -481,8 +499,10 @@ void XrContext::shutdown() {
   }
   frames_.destroy(device_);
 
+  if (stageSpace_) xrDestroySpace(stageSpace_);
   if (appSpace_) xrDestroySpace(appSpace_);
   if (session_) xrDestroySession(session_);
+  stageSpace_ = XR_NULL_HANDLE;
   appSpace_ = XR_NULL_HANDLE;
   session_ = XR_NULL_HANDLE;
 

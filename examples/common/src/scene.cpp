@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
+#include <fstream>
+#include <iterator>
 
 namespace {
 
@@ -26,7 +28,25 @@ BBox authoredBBox(const std::filesystem::path& path) {
   return b.valid() ? b : BBox{};
 }
 
+std::string urlName(const std::string& url) {
+  const auto slash = url.find_last_of('/');
+  const std::string name = slash == std::string::npos ? url : url.substr(slash + 1);
+  return name.empty() ? url : name;
+}
+
+// The path of a URL ends in .mint, before any query.
+bool isMintUrl(const std::string& url) {
+  std::string path = url.substr(0, url.find_first_of("?#"));
+  for (char& c : path) c = (char)std::tolower((unsigned char)c);
+  return path.size() >= 5 && path.compare(path.size() - 5, 5, ".mint") == 0;
+}
+
 }  // namespace
+
+std::vector<uint8_t> readHeadFile(const std::filesystem::path& path) {
+  std::ifstream in(path, std::ios::binary);
+  return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+}
 
 std::unique_ptr<Scene> Scene::create(const gracia::Context* context,
                                      const std::filesystem::path& path) {
@@ -48,39 +68,62 @@ std::unique_ptr<Scene> Scene::create(const gracia::Context* context,
                                             count, 0.0));
   }
 
+  // A .grv states its bounds in its head, which lands after the open.
+  if (ext == ".grv") {
+    std::filesystem::path headPath = path;
+    headPath += ".head";
+    const std::vector<uint8_t> head = readHeadFile(headPath);
+    return fromVideo(gracia::VideoStream(context, nullptr, path, false, head),
+                     path.filename().string(), {});
+  }
+
   // Anything else: try it as MINT video (named .mint, or one despite no ext).
   if (ext != ".mint" && gracia::videoMintVersionFromFile(path) == 0) return nullptr;
-  gracia::VideoStream stream(context, static_cast<const char*>(nullptr), path, false);
-  if (!stream.get()) return nullptr;
-  BBox authored = authoredBBox(path);
-  BBox bbox = authored.valid() ? authored : toBBox(stream.bbox());
-  const uint32_t budget = clampU32(stream.maxSplatsCount());
-  const double duration = stream.duration();
-  return std::unique_ptr<Scene>(new Scene(std::move(stream), true,
-                                          path.filename().string(), bbox, bbox, budget,
-                                          duration));
+  return fromVideo(gracia::VideoStream(context, nullptr, path, false),
+                   path.filename().string(), authoredBBox(path));
 }
 
 std::unique_ptr<Scene> Scene::createStream(const gracia::Context* context,
                                            const std::string& url,
-                                           const std::string& token) {
-  gracia::VideoStream stream(context, url.c_str(), token.empty() ? nullptr : token.c_str());
+                                           const std::string& token,
+                                           const std::vector<uint8_t>& head) {
+  if (token.empty() && !isMintUrl(url))
+    return fromVideo(gracia::VideoStream::fromGrvUrl(context, url.c_str(), head),
+                     urlName(url), {});
+  return fromVideo(
+      gracia::VideoStream::fromUrl(context, url.c_str(), token.empty() ? nullptr : token.c_str()),
+      urlName(url), {});
+}
+
+std::unique_ptr<Scene> Scene::fromVideo(gracia::VideoStream stream, std::string name,
+                                        BBox authored) {
   if (!stream.get()) return nullptr;
-  std::string name = url;
-  if (auto slash = url.find_last_of('/'); slash != std::string::npos)
-    name = url.substr(slash + 1);
-  BBox bbox = toBBox(stream.bbox());
-  BBox adaptive = toBBox(stream.adaptiveBBox());
+  // A video has no percentile box: it frames on its whole box.
+  const BBox bbox = authored.valid() ? authored : toBBox(stream.bbox());
   const uint32_t budget = clampU32(stream.maxSplatsCount());
   const double duration = stream.duration();
-  return std::unique_ptr<Scene>(new Scene(std::move(stream), true,
-                                          name.empty() ? url : name, bbox, adaptive,
-                                          budget, duration));
+  return std::unique_ptr<Scene>(new Scene(std::move(stream), true, std::move(name), bbox,
+                                          bbox, budget, duration));
 }
 
 Scene::RenderRef Scene::renderRef() {
   if (video_) return &vid();
   return &stat();
+}
+
+std::optional<GraciaPose> Scene::viewpoint(GraciaViewpoint display) const {
+  return video_ ? vid().viewpoint(display) : std::nullopt;
+}
+
+std::optional<glm::vec3> Scene::pivot() const {
+  if (!video_) return std::nullopt;
+  const auto p = vid().pivot();
+  if (!p) return std::nullopt;
+  return glm::vec3((*p)[0], (*p)[1], (*p)[2]);
+}
+
+GraciaVideoStatus Scene::status() const {
+  return video_ ? vid().status() : GRACIA_VIDEO_STATUS_OK;
 }
 
 void Scene::setColorGrade(float hue, float saturation, float value, float weight) {
@@ -109,6 +152,14 @@ void Scene::setTime(double t) {
   if (video_) vid().setTime(t);
 }
 
+void Scene::setSpeed(double s) {
+  if (video_) vid().setSpeed(s);
+}
+
+void Scene::setVolume(float v) {
+  if (video_) vid().setVolume(v);
+}
+
 bool Scene::pump() {
   if (!video_) return false;
   if (!isSettled()) settle();
@@ -120,7 +171,7 @@ void Scene::settle() {
   if (splatsBudget_ == 0) splatsBudget_ = clampU32(vid().maxSplatsCount());
   if (!bbox_.valid()) {
     bbox_ = toBBox(vid().bbox());
-    adaptiveBBox_ = toBBox(vid().adaptiveBBox());
+    adaptiveBBox_ = bbox_;
   }
 }
 
@@ -171,12 +222,32 @@ bool SceneGroup::hasVideo() const {
   return false;
 }
 
+std::optional<GraciaPose> SceneGroup::viewpoint(GraciaViewpoint display) const {
+  for (const auto& s : scenes_)
+    if (auto v = s->viewpoint(display)) return v;
+  return std::nullopt;
+}
+
+std::optional<glm::vec3> SceneGroup::pivot() const {
+  for (const auto& s : scenes_)
+    if (auto p = s->pivot()) return p;
+  return std::nullopt;
+}
+
 void SceneGroup::setTransform(const glm::mat4& m) {
   for (auto& s : scenes_) s->setTransform(m);
 }
 
 void SceneGroup::setTime(double t) {
   for (auto& s : scenes_) s->setTime(t);
+}
+
+void SceneGroup::setSpeed(double s) {
+  for (auto& scene : scenes_) scene->setSpeed(s);
+}
+
+void SceneGroup::setVolume(float v) {
+  for (auto& s : scenes_) s->setVolume(v);
 }
 
 bool SceneGroup::pump() {

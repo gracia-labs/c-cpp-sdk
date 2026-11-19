@@ -10,16 +10,23 @@ look of each scene.
 - **Multiple scenes at once** — open several files together. `mix` composites
   them into one image. `split` shows one scene in each column that you can drag
   (an A/B wipe that shares the camera). Press **M** to toggle.
-- **Static and video** — `.ply` / `.sog` / `.guf` static splats and `.mint`
-  volumetric video, plus HTTP(S) MINT streams (**File ▸ Open Stream…**).
-- **Transport** — for video: play/pause, a scrub bar and playback speed. The
-  play button becomes a spinner while the video cannot show the current time.
+- **Static and video** — `.ply` / `.sog` / `.guf` static splats and `.mint` /
+  `.grv` volumetric video, plus HTTP(S) streams of both (**File ▸ Open Stream…**).
+  A local `.grv` that holds a head hash opens with the head beside it: the file
+  with `.head` after its name.
+- **Transport** — for video: play/pause, a scrub bar, playback speed and volume.
+  The play button becomes a spinner while the video cannot show the current time.
+- **Sound** — the SDK plays the sound of each `.grv` on the default playback
+  device, with the listener at the camera. The sound stops while the clock
+  parks, and it plays only at a speed from 0.5 to 2.
 - **Appearance for each scene** — Visibility and HSV (Hue / Saturation / Value)
   grade sliders. Adjust the sliders for each scene, with Reset.
 - **Scene flags** — **File ▸ Set Flag…** sets an SDK flag (key + on/off) on the
   loaded scene(s).
 - **Full camera** — trackball orbit, pan, dolly, and a WASD fly mode with
-  inertia. The camera frames the scene bounds automatically.
+  inertia. The camera frames the scene bounds automatically. A `.grv` that
+  states a pivot and a display viewpoint frames about the pivot and starts at
+  the viewpoint.
 
 The viewer recreates the renderer to match the splat budget when the scenes
 change: on load, on a mix or split switch, and when the real splat count of a
@@ -62,6 +69,10 @@ and a placeholder splat budget until the metadata lands. The viewer pumps the
 scene, watches `isSettled()`, then rebuilds the renderers on the real budget, sets
 the playback range, and frames the camera again.
 
+**The sound follows the clock.** In each frame the player sets the speed of each
+video: the speed of the clock while the clock moves, and 0 while it parks. The
+viewer puts the listener at the camera of the frame.
+
 **Keep the scrub bar continuous.** Dear ImGui rounds the value of a slider to the
 precision of the display format, so `"%.1fs"` gives steps of 100 ms. The transport
 sets `ImGuiSliderFlags_NoRoundToFormat` and reads the drag state with
@@ -91,9 +102,12 @@ desktop_viewer.exe [scene ...] [options]
 
 Pass one or more scene files. Or start with none, and **drag and drop** files
 onto the window (two or more files open in split mode). The supported formats are
-`.ply`, `.sog`, `.guf`, and `.mint`.
+`.ply`, `.sog`, `.guf`, `.mint` and `.grv`.
 
-Options: `--split`, `--stream <url>`, `--token <t>`, `--zoom <f>`, `--seek <s>`.
+Options: `--split`, `--stream <url>`, `--token <t>`, `--head <file>`, `--zoom <f>`,
+`--seek <s>`. A stream with a token, or a URL whose path ends in `.mint`, opens as
+a MINT video. Any other URL opens as a `.grv`, with the head in `<file>` where it
+holds a head hash.
 
 ### Controls
 
@@ -105,7 +119,7 @@ Options: `--split`, `--stream <url>`, `--token <t>`, `--zoom <f>`, `--seek <s>`.
 | W A S D / R F / Q E   | Fly: move / up-down / roll          |
 | Shift                 | Sprint                              |
 | Space                 | Play / pause video                  |
-| 0                     | Reset framing                       |
+| 0                     | Back to the start view              |
 | M                     | Toggle mix / split                  |
 
 ## Layout

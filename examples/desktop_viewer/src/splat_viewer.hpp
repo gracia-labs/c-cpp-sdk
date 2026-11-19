@@ -49,7 +49,8 @@ class SplatViewer {
   SplatViewer& operator=(const SplatViewer&) = delete;
 
   bool loadScenes(const std::vector<std::filesystem::path>& paths, SceneLayout layout);
-  bool loadStream(const std::string& url, const std::string& token);
+  bool loadStream(const std::string& url, const std::string& token,
+                  const std::vector<uint8_t>& head = {});
 
   // Per frame, in order: advance (playback clock + settle + camera), then
   // prepare (SDK compute prep, blocking) before the render pass, then record.

@@ -8,7 +8,7 @@ surface is a small C ABI (`gracia/SDK.h`) with a header-only C++ wrapper
 ## Platforms
 
 This SDK ships a prebuilt binary for **Windows x64**, **Android arm64-v8a**
-and **Linux x86_64**. [CMakeLists.txt](CMakeLists.txt) selects the archive that
+and **Linux x86_64 and aarch64**. [CMakeLists.txt](CMakeLists.txt) selects the archive that
 matches the target platform. The **examples run on Windows and Linux**: on
 Android link `gracia::sdk` from your own build.
 
@@ -28,7 +28,8 @@ AGENTS.md                      Rules for a player: the device, the clock, the dr
 artifacts/
   windows.zip                  Prebuilt SDK (include/, gracia_sdk.dll, gracia_sdk.lib)
   android.zip                  Prebuilt SDK (include/, libgracia_sdk.so, arm64-v8a)
-  linux.zip                    Prebuilt SDK (include/, libgracia_sdk.so, x86_64)
+  linux-x86_64.zip             Prebuilt SDK (include/, libgracia_sdk.so, x86_64)
+  linux-aarch64.zip            Prebuilt SDK (include/, libgracia_sdk.so, aarch64)
 cmake/CPM.cmake                CPM.cmake package manager (used by the examples)
 deps/                          Vulkan headers, GLM, volk, GLFW, OpenXR, Dear ImGui,
                                portable-file-dialogs
@@ -40,7 +41,8 @@ examples/
 package.json                   The build:linux command
 prebuilt/
   linux-x86_64.zip             Linux examples, ready to run (see Linux build)
-scripts/build-linux.js         Builds prebuilt/linux-x86_64.zip in Docker
+  linux-aarch64.zip            The same for aarch64
+scripts/build-linux.js         Builds prebuilt/linux-<cpu>.zip in Docker
 ```
 
 The archives ship prebuilt in this repository. Thus the examples build without
@@ -49,7 +51,7 @@ and [CPM](https://github.com/cpm-cmake/CPM.cmake) reads the archives from disk.
 
 ## Prerequisites
 
-- Windows 10/11 or Linux x86_64 with a Vulkan 1.3 capable GPU and current drivers.
+- Windows 10/11, or Linux x86_64 or aarch64, with a Vulkan 1.3 capable GPU and current drivers.
 - CMake ≥ 3.21 and a C++20 compiler (MSVC or clang-cl on Windows, GCC or Clang
   on Linux).
 - No network access: the build resolves every dependency from `deps/`.
@@ -87,10 +89,10 @@ pipeline when you create it.
 
 | | Windows | Android | Linux |
 | --- | --- | --- | --- |
-| Target | x64 | arm64-v8a | x86_64 |
-| Compiler | clang-cl (LLVM 22) | NDK **r27d** (27.3.13750724), Android clang 18 | GCC 13 (`gcc-toolset-13`), manylinux_2_28 |
-| Minimum platform | Windows 10, Vulkan 1.3 | API level 32 (Android 12L) | glibc 2.28, Vulkan 1.3 |
-| C++ runtime | C++20, static CRT (`/MT`) | C++20, static libc++ (`c++_static`) | C++20, system `libstdc++.so.6` (GCC 8 or later) |
+| Target | x64 | arm64-v8a | x86_64, aarch64 |
+| Compiler | clang-cl (LLVM 23) | NDK **r27d** (27.3.13750724), Android clang 18 | GCC 13 (`gcc-toolset-13`), manylinux_2_28 on x86_64 and manylinux_2_34 on aarch64 |
+| Minimum platform | Windows 10, Vulkan 1.3 | API level 32 (Android 12L) | glibc 2.28 on x86_64 and 2.34 on aarch64, Vulkan 1.3 |
+| C++ runtime | C++20, static CRT (`/MT`) | C++20, static libc++ (`c++_static`) | C++20, static libstdc++ and libgcc |
 | Build | Ninja, Release | Ninja, Release | Ninja, Release |
 
 These are the versions of the build, not a requirement of your own toolchain. A
@@ -110,11 +112,12 @@ C++ ABI between your code and the library.
   on an earlier one. Thus the library needs glibc 2.28 or later: Debian 10,
   Ubuntu 20.04, RHEL 8, Fedora 29 or a later release. `ldd --version` shows the
   glibc version of a system.
-- `gcc-toolset-13` links the parts of the C++ runtime that are newer than GCC 8
-  into the library. Thus the library needs only the system `libstdc++.so.6` of
-  GCC 8 or later. Each distribution with glibc 2.28 has it.
-- The Linux library needs only `libc`, `libm`, `libdl`, `libpthread`,
-  `libgcc_s` and `libstdc++`. It exports only the `gracia_*` functions.
+- The aarch64 library compiles on the `manylinux_2_34` image (AlmaLinux 9),
+  as the shader compiler of aarch64 needs glibc 2.34. Thus it needs glibc 2.34
+  or later: Debian 12, Ubuntu 22.04, RHEL 9 or a later release.
+- The Linux library holds libstdc++ and libgcc inside it. It needs only `libc`,
+  `libm`, `libdl` and `libpthread`, and it exports only the `gracia_*` functions.
+  Thus it does not conflict with the C++ runtime of your application.
 - Neither library links the Vulkan loader. The SDK loads Vulkan at run time.
 
 ## Building the examples
@@ -150,17 +153,24 @@ to it or on the library path.
 
 ## Linux build
 
-`build:linux` builds both examples in Docker and writes one archive:
+`build:linux` builds both examples in Docker and writes one archive for a CPU,
+x86_64 when you name no CPU:
 
 ```sh
 bun run build:linux
+bun run build:linux aarch64
 ```
 
 - **Needs:** Docker and [Bun](https://bun.sh). No other toolchain.
-- **Output:** `prebuilt/linux-x86_64.zip`, with `libgracia_sdk.so`,
-  `desktop_viewer` and `xr_viewer`.
-- The image is manylinux_2_28 with GCC 14. Thus the executables run on glibc
-  2.28 and later. Each build is a clean build.
+- **Output:** `prebuilt/linux-x86_64.zip` or `prebuilt/linux-aarch64.zip`, with
+  `libgracia_sdk.so`, `desktop_viewer` and `xr_viewer`.
+- Docker emulates a CPU that the host does not have, thus a build for aarch64 on
+  an x86_64 host is slow.
+- The image is manylinux_2_28 on x86_64 and manylinux_2_34 on aarch64, with
+  GCC 14. Each executable holds libstdc++ and libgcc inside it. On x86_64 it runs
+  on glibc 2.28 and later. On aarch64 it also takes `_dl_find_object` of glibc
+  2.35, which RHEL 9 gives too: Debian 12, Ubuntu 22.04 and RHEL 9 run it. Each
+  build is a clean build.
 
 To run the examples, extract the archive and start an executable from that
 directory. Each executable finds `libgracia_sdk.so` next to itself.
@@ -173,8 +183,9 @@ directory. Each executable finds `libgracia_sdk.so` next to itself.
 ## Examples
 
 - [desktop_viewer](examples/desktop_viewer/) — a Vulkan desktop viewer that
-  loads `.ply` / `.sog` / `.guf` splat scenes and renders them with an ImGui
-  control panel. It is similar to the Mac viewer of the
+  loads `.ply` / `.sog` / `.guf` splat scenes and `.mint` / `.grv` videos, and
+  renders them with an ImGui control panel. It plays the sound of a `.grv` on the
+  default playback device. It is similar to the Mac viewer of the
   [Apple SDK](https://github.com/gracia-labs/apple-sdk).
 - [xr_viewer](examples/xr_viewer/) — the same viewer in stereo on a headset.
   It keeps the Vulkan setup and replaces the window and the present loop with an
@@ -182,7 +193,7 @@ directory. Each executable finds `libgracia_sdk.so` next to itself.
 
 Read [AGENTS.md](AGENTS.md) before you write a player of your own. It holds the
 playback rules: the client owns the clock, the draw runs also while a scene
-buffers, and the frame lifetime. The same rules are in the
+buffers, the frame lifetime, and the sound. The same rules are in the
 [desktop viewer README](examples/desktop_viewer/README.md#playback-rules).
 
 ## Demo content
@@ -194,9 +205,13 @@ Three ways to play a scene:
 - **Local file** — download it and open it: `File > Open` in the desktop viewer, or a path
   argument.
 - **Direct URL** — a direct link to the file streams as it is, with no token.
-  Paste it in the URL field of the desktop viewer, or pass `--stream <url>`.
+  Paste it in the URL field of the desktop viewer, or pass `--stream <url>`. A
+  URL whose path ends in `.mint` opens as a MINT video, and any other URL as a
+  `.grv`. A `.grv` that holds a head hash needs its head: `--head <file>`, or the
+  Head file field.
 - **Gracia stream** — streaming through Gracia infrastructure, with a token:
   `--stream <url> --token <t>`, or the URL and Token fields in the desktop viewer.
+  A URL with a token opens as a MINT video.
 
 A direct link works from any static host, thus it is the quickest way to try a
 stream. Gracia infrastructure is the more reliable path.

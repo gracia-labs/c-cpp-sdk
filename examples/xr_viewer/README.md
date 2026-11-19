@@ -7,12 +7,18 @@ Put the headset on, and the scene stands in front of you.
 
 ## What it does
 
-- **Static and video** — `.ply` / `.sog` / `.guf` static splats and `.mint`
-  volumetric video, plus HTTP(S) MINT streams (`--stream`).
+- **Static and video** — `.ply` / `.sog` / `.guf` static splats and `.mint` /
+  `.grv` volumetric video, plus HTTP(S) streams of both (`--stream`).
 - **Stereo** — one renderer, one `render()` call for each frame, and one draw
   call for each eye (multipass stereo).
 - **Head tracking** — the runtime supplies the pose and the projection of each
   eye. The scene is placed in front of the origin of the reference space.
+- **VR viewpoint** — a `.grv` that states a VR viewpoint plays at full size: you
+  stand on its floor under the viewpoint, and you look along its heading. The
+  height of the floor comes from the `STAGE` space of the runtime. A runtime with
+  no `STAGE` space gets the placement of other content.
+- **Sound** — the SDK plays the sound of each `.grv` on the default playback
+  device, with the listener at the head between the two eyes.
 - **Video playback** — the same clock as the desktop viewer. The video loops.
 
 ## Shared code
@@ -45,9 +51,10 @@ xr_viewer.exe <scene.ply|.sog|.guf|.mint> [more scenes ...] [options]
 
 | Option | Effect |
 |---|---|
-| `--stream <url>` / `--token <t>` | Open an HTTP(S) MINT stream. |
+| `--stream <url>` / `--token <t>` | Open an HTTP(S) stream: a MINT with a token or a URL that ends in `.mint`, else a `.grv`. |
+| `--head <file>` | The head of a `.grv` stream that holds a head hash. A local `.grv` takes the file beside it. |
 | `--seek <s>` | Start the video at this time. |
-| `--scale <m>` | Target scene radius in metres (default 0.75). |
+| `--scale <m>` | Target scene radius in metres (default 0.75). This option and the two below apply to content with no VR viewpoint. |
 | `--distance <m>` | Metres in front of the origin (default 2.0). |
 | `--height <m>` | Metres above the origin (default 0.0). |
 

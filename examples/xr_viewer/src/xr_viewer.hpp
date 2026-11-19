@@ -16,7 +16,8 @@ class XrViewer {
   ~XrViewer() { shutdown(); }
 
   bool load(const XrContext& xr, const std::vector<std::filesystem::path>& scenes,
-            const std::string& streamUrl, const std::string& token);
+            const std::string& streamUrl, const std::string& token,
+            const std::vector<uint8_t>& key);
   void shutdown();
 
   SplatsPlayer& player() { return player_; }
@@ -27,9 +28,9 @@ class XrViewer {
   void prepare(const XrFrameCtx& f);
   void record(uint32_t slot, uint32_t eye, VkCommandBuffer cmd);
 
-  // Places the scene in front of the reference-space origin, and remembers the
-  // numbers so advance() can place it again once late metadata gives the
-  // bounding box its real size.
+  // The placement of content with no VR viewpoint: in front of the origin of the
+  // reference space, scaled to a radius. prepare() places the scene once its box
+  // lands, and again after late metadata.
   void placeScene(float scaleMeters, float distanceMeters, float heightMeters);
 
   uint32_t visibleSplats() const {
@@ -38,12 +39,16 @@ class XrViewer {
 
  private:
   bool rebuildRenderer();
+  void place(const std::optional<float>& floorY);
 
   SplatsPlayer player_;
   gracia::SdkSplatsRenderer renderer_;
   // Both eyes come from one render() call, so one entry holds both views.
   std::array<gracia::DrawCalls, XrContext::kFramesInFlight> frames_;
   bool checkedStereo_ = false;
+  bool placed_ = false;
+  bool hasFloor_ = false;
+  bool reportedProblem_ = false;
   float scale_ = 0.75f, distance_ = 0.5f, height_ = 0.5f;
   GraciaColorFormat color_ = GRACIA_COLOR_FORMAT_RGBA8_UNORM;
 };

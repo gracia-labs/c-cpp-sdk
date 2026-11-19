@@ -152,8 +152,8 @@ void onDrop(GLFWwindow* w, int count, const char** paths) {
 std::vector<std::filesystem::path> openFileDialog() {
   std::vector<std::filesystem::path> out;
   for (const std::string& file :
-       pfd::open_file("Open one or more .ply, .sog, .guf or .mint scenes", "",
-                      {"Gracia scenes", "*.ply *.sog *.guf *.mint", "All files", "*"},
+       pfd::open_file("Open one or more .ply, .sog, .guf, .mint or .grv scenes", "",
+                      {"Gracia scenes", "*.ply *.sog *.guf *.mint *.grv", "All files", "*"},
                       pfd::opt::multiselect)
            .result())
     out.push_back(utf8Path(file));
@@ -218,7 +218,7 @@ void drawHUD(SplatViewer& viewer, float fps) {
   ImGui::Begin("HUD", nullptr, flags);
   if (!p.hasScenes()) {
     ImGui::TextUnformatted(
-        "Drop .ply / .sog / .guf / .mint files here, or File > Open.");
+        "Drop .ply / .sog / .guf / .mint / .grv files here, or File > Open.");
   } else {
     std::string names;
     for (size_t i = 0; i < p.sceneCount(); ++i) {
@@ -235,6 +235,8 @@ void drawHUD(SplatViewer& viewer, float fps) {
   }
   if (!p.lastError().empty())
     ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", p.lastError().c_str());
+  if (const std::string problem = p.videoProblem(); !problem.empty())
+    ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", problem.c_str());
   ImGui::End();
 }
 
@@ -300,7 +302,7 @@ void drawTransport(SplatViewer& viewer) {
 
   float t = (float)p.playhead();
   const float dur = (float)p.duration();
-  ImGui::SetNextItemWidth(vp->WorkSize.x * 0.55f);
+  ImGui::SetNextItemWidth(vp->WorkSize.x * 0.45f);
   // NoRoundToFormat: otherwise "%.1fs" quantizes the playhead to 100ms steps.
   const bool moved = ImGui::SliderFloat("##time", &t, 0.0f, dur > 0 ? dur : 1.0f,
                                         "%.1fs", ImGuiSliderFlags_NoRoundToFormat);
@@ -310,10 +312,15 @@ void drawTransport(SplatViewer& viewer) {
   ImGui::SameLine();
   ImGui::Text("%.1f / %.1f s", p.playhead(), p.duration());
   ImGui::SameLine();
+  // The sound of a .grv plays only at a speed from 0.5 to 2.
   float speed = (float)p.playbackSpeed();
   ImGui::SetNextItemWidth(120);
   if (ImGui::SliderFloat("speed", &speed, 0.1f, 4.0f, "%.1f×"))
     p.setPlaybackSpeed(speed);
+  ImGui::SameLine();
+  float volume = p.volume();
+  ImGui::SetNextItemWidth(100);
+  if (ImGui::SliderFloat("volume", &volume, 0.0f, 1.0f, "%.2f")) p.setVolume(volume);
   ImGui::End();
 }
 
@@ -330,10 +337,15 @@ void drawDialogs(SplatViewer& viewer, bool& openStream, bool& openFlag) {
                              ImGuiWindowFlags_AlwaysAutoResize)) {
     static char url[512] = "https://";
     static char token[256] = "";
+    static char headFile[512] = "";
     ImGui::InputText("URL", url, sizeof(url));
     ImGui::InputText("Token", token, sizeof(token));
+    ImGui::InputText("Head file", headFile, sizeof(headFile));
+    if (ImGui::IsItemHovered())
+      ImGui::SetTooltip("The head of a .grv that holds a head hash; empty for none");
     if (ImGui::Button("Open") && url[0]) {
-      viewer.loadStream(url, token);
+      viewer.loadStream(url, token, headFile[0] ? readHeadFile(utf8Path(headFile))
+                                                : std::vector<uint8_t>{});
       ImGui::CloseCurrentPopup();
     }
     ImGui::SameLine();
@@ -359,6 +371,7 @@ struct Options {
   std::vector<std::filesystem::path> scenes;
   SceneLayout layout = SceneLayout::Mix;
   std::string stream, token;
+  std::filesystem::path head;
   float zoom = 1.0f;
   double seek = -1.0;
 };
@@ -370,6 +383,7 @@ Options parseArgs(int argc, char** argv) {
     if (a == "--split") o.layout = SceneLayout::Split;
     else if (a == "--stream" && i + 1 < argc) o.stream = argv[++i];
     else if (a == "--token" && i + 1 < argc) o.token = argv[++i];
+    else if (a == "--head" && i + 1 < argc) o.head = argv[++i];
     else if (a == "--zoom" && i + 1 < argc) o.zoom = (float)atof(argv[++i]);
     else if (a == "--seek" && i + 1 < argc) o.seek = atof(argv[++i]);
     else if (!a.empty() && a[0] != '-') o.scenes.emplace_back(a);
@@ -424,7 +438,8 @@ int main(int argc, char** argv) {
       viewer->player().seek(opts.seek);
     }
   } else if (!opts.stream.empty()) {
-    if (!viewer->loadStream(opts.stream, opts.token))
+    const auto head = opts.head.empty() ? std::vector<uint8_t>{} : readHeadFile(opts.head);
+    if (!viewer->loadStream(opts.stream, opts.token, head))
       std::fprintf(stderr, "Stream failed: %s\n", viewer->player().lastError().c_str());
   }
 

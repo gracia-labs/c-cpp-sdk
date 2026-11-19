@@ -8,6 +8,7 @@
 
 #include <cmath>
 
+#include <gracia/SDK.h>
 #include <gracia_demo/math3d.hpp>
 
 // Reverse-Z projection from an asymmetric XrFovf, in the layout
@@ -46,6 +47,29 @@ inline glm::mat4 xrPose(const XrPosef& pose) {
   glm::mat4 m = glm::mat4_cast(glm::normalize(q));
   m[3] = glm::vec4(pose.position.x, pose.position.y, pose.position.z, 1.0f);
   return m;
+}
+
+// The head between the two eyes, as camera-to-world: the listener of the sound.
+inline glm::mat4 xrHead(const XrPosef& left, const XrPosef& right) {
+  const auto quat = [](const XrQuaternionf& q) { return glm::quat(q.w, q.x, q.y, q.z); };
+  const glm::quat q = glm::slerp(quat(left.orientation), quat(right.orientation), 0.5f);
+  glm::mat4 m = glm::mat4_cast(glm::normalize(q));
+  m[3] = glm::vec4((left.position.x + right.position.x) * 0.5f,
+                   (left.position.y + right.position.y) * 0.5f,
+                   (left.position.z + right.position.z) * 0.5f, 1.0f);
+  return m;
+}
+
+// A VR viewpoint at full size: the floor of the content (y = 0) under the pose
+// goes onto the floor at `floorY` under the origin, and the heading of the pose
+// looks along -Z. The headset keeps its own height and tilt.
+inline glm::mat4 placeAtViewpoint(const GraciaPose& pose, float floorY) {
+  const float* r = pose.rotation;  // {x, y, z, w}
+  const glm::vec3 forward = glm::quat(r[3], r[0], r[1], r[2]) * glm::vec3(0, 0, -1);
+  const float heading = std::atan2(-forward.x, -forward.z);
+  glm::mat4 m = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, floorY, 0.0f));
+  m = glm::rotate(m, -heading, glm::vec3(0, 1, 0));
+  return glm::translate(m, glm::vec3(-pose.position[0], 0.0f, -pose.position[2]));
 }
 
 // The user stands at the origin, so move the scene in front of them. Feed this

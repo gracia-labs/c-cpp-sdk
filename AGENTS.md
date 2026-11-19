@@ -10,8 +10,8 @@ every rule below: [`examples/desktop_viewer`](examples/desktop_viewer/) on a win
 
 ## Orientation
 
-The SDK is a prebuilt binary in `artifacts/windows.zip`, `artifacts/android.zip` and
-`artifacts/linux.zip`: a C ABI (`gracia/SDK.h`) and a header-only C++ wrapper (`gracia/SDK.hpp`). On
+The SDK is a prebuilt binary in `artifacts/windows.zip`, `artifacts/android.zip`,
+`artifacts/linux-x86_64.zip` and `artifacts/linux-aarch64.zip`: a C ABI (`gracia/SDK.h`) and a header-only C++ wrapper (`gracia/SDK.hpp`). On
 Windows, Android and Linux the SDK renders with Vulkan. The two examples run on Windows and Linux.
 
 Correct a playback defect in the player, not in the SDK. The SDK core and the video loader are shared
@@ -129,6 +129,31 @@ one; the SDK serves both, and it keys its pipeline cache on that handle. Either 
 27. Read the drag state with `ImGui::IsItemActive()` directly after the slider. The return value of
     the slider is true only for the frames with a new value, and that is not the full drag.
 
+## Sound
+
+28. Select the output of the sound in `GraciaContextDescriptor::audio`. `DEVICE` plays on the default
+    playback device. `HOST` opens no device, and your engine reads the mix with `gracia_audio_read`
+    on its own audio thread. `NONE` is the default (zero): a video then plays no sound and fetches no
+    chunk of a sound. The examples select `DEVICE`.
+29. Set the speed of each video in each frame: the speed of the clock while the clock moves, and 0
+    while it parks. The default speed is 0, thus a video plays no sound until the player sets a speed.
+    `SplatsPlayer::advance` sets the speed from the same condition that steps the clock (rules 4 and
+    5), thus a pause, a scrub and a buffer stop the sound.
+30. Put the listener at the camera in each frame, with the camera-to-world transform of the frame. In
+    a headset, give the head between the two eyes, not one eye.
+31. The sound plays only at a speed from 0.5 to 2. At another speed the video plays with no sound.
+
+## The head of a .grv
+
+32. The viewpoint, the pivot and the status of a `.grv` come with its head, after the open. Read the
+    viewpoint and the pivot when the metadata lands (rule 17), as the box. Frame the camera about the
+    pivot, and start it at the `DISPLAY` viewpoint. In a headset, put the floor of the content under
+    the `VR` viewpoint onto the floor of the room, at full size.
+33. Read `status()` only after `ready()` returns false: `ready()` reads the head. A status other than
+    `OK` does not change. Destroy the stream, and open a `HEAD_HASH` video again with its head.
+34. A local `.grv` that holds a head hash takes the head in the file beside it, with `.head` after its
+    name. A stream takes the head as an argument.
+
 ## Looks broken, but is not
 
 - **The screen flips between two moments of the video in a rewind** → rules 4, 6, 7, 10 and 11.
@@ -146,18 +171,24 @@ one; the SDK serves both, and it keys its pipeline cache on that handle. Either 
 - **The headset shows a black or garbled image** → rule 23.
 - **The scene sits inside the user** → place it in front of the origin of the reference space. The
   bounding box of a stream is empty until the metadata lands, so place it again after rule 17.
+- **A `.grv` plays no sound** → rules 28, 29 and 31.
+- **The sound comes from the wrong side, or does not move with the camera** → rule 30.
+- **A `.grv` draws nothing, and the HUD says that it holds a head hash** → rule 34.
 
 ## Verify a change
 
-There is no automated test for the player. Build the desktop viewer, then run it against a `.mint`:
+There is no automated test for the player. Build the desktop viewer, then run it against a `.mint`
+and a `.grv`:
 
 ```sh
 cmake --build build --config Release --target desktop_viewer
 build/bin/Release/desktop_viewer.exe scene.mint
+build/bin/Release/desktop_viewer.exe scene.grv
 ```
 
 Test a rewind with the scrub bar, a loop at the end of the clip, and both layouts
-(`a.mint b.sog`, and `a.mint b.mint --split`).
+(`a.mint b.sog`, and `a.mint b.mint --split`). With a `.grv` that has sound, test that a pause, a
+scrub and a speed above 2 stop the sound, and that the sound moves when the camera turns.
 
 The headset viewer needs a runtime. The Meta XR Simulator is enough: it reports a Meta Quest 3, and
 it renders the Vulkan path correctly, so no hardware is needed to test a change. Without a runtime or

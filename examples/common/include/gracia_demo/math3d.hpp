@@ -13,6 +13,10 @@ struct BBox {
   glm::vec3 center() const { return (lo + hi) * 0.5f; }
   glm::vec3 size() const { return hi - lo; }
   float radius() const { return glm::length(size()) * 0.5f; }
+  // The radius of the smallest sphere about `p` that holds the box.
+  float radiusAbout(glm::vec3 p) const {
+    return glm::length(glm::max(glm::abs(lo - p), glm::abs(hi - p)));
+  }
 
   bool valid() const {
     return lo.x <= hi.x && lo.y <= hi.y && lo.z <= hi.z && std::isfinite(lo.x) &&

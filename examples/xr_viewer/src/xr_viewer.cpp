@@ -5,6 +5,7 @@
 #include "xr_math.hpp"
 
 #include <algorithm>
+#include <cstdio>
 
 namespace {
 
@@ -17,9 +18,11 @@ constexpr float kFarZ = 1e2f;
 
 bool XrViewer::load(const XrContext& xr,
                     const std::vector<std::filesystem::path>& scenes,
-                    const std::string& streamUrl, const std::string& token) {
+                    const std::string& streamUrl, const std::string& token,
+                    const std::vector<uint8_t>& key) {
   color_ = xr.colorFormat();
-  const bool ok = scenes.empty() ? player_.loadStream(streamUrl, token)
+  hasFloor_ = xr.hasFloor();
+  const bool ok = scenes.empty() ? player_.loadStream(streamUrl, token, key)
                                  : player_.loadScenes(scenes);
   return ok && rebuildRenderer();
 }
@@ -49,7 +52,12 @@ void XrViewer::advance(float dt) {
   // Late metadata: rebuild on the real budget, place the scene again.
   if (player_.consumeSettled()) {
     rebuildRenderer();
-    placeScene(scale_, distance_, height_);
+    placed_ = false;
+  }
+  if (const std::string problem = player_.videoProblem();
+      !problem.empty() && !reportedProblem_) {
+    std::fprintf(stderr, "%s\n", problem.c_str());
+    reportedProblem_ = true;
   }
 }
 
@@ -58,11 +66,22 @@ void XrViewer::placeScene(float scaleMeters, float distanceMeters,
   scale_ = scaleMeters;
   distance_ = distanceMeters;
   height_ = heightMeters;
+  placed_ = false;
+}
+
+void XrViewer::place(const std::optional<float>& floorY) {
   SceneGroup* group = player_.group();
-  if (!group) return;
+  if (placed_ || !group) return;
   const BBox box = group->boundingBox();
   if (!box.valid()) return;  // a stream has no box until its metadata lands
-  group->setTransform(placeSceneForXr(box, scaleMeters, distanceMeters, heightMeters));
+  const auto viewpoint = group->viewpoint(GRACIA_VIEWPOINT_VR);
+  if (viewpoint && hasFloor_) {
+    if (!floorY) return;  // the runtime can locate its floor some frames late
+    group->setTransform(placeAtViewpoint(*viewpoint, *floorY));
+  } else {
+    group->setTransform(placeSceneForXr(box, scale_, distance_, height_));
+  }
+  placed_ = true;
 }
 
 void XrViewer::prepare(const XrFrameCtx& f) {
@@ -70,6 +89,8 @@ void XrViewer::prepare(const XrFrameCtx& f) {
   draws = {};
   SceneGroup* group = player_.group();
   if (!player_.hasScenes() || !renderer_) return;
+  place(f.floorY);
+  player_.setListener(xrHead(f.views[0].pose, f.views[1].pose));
 
   glm::mat4 proj[2], cam[2];
   for (int i = 0; i < 2; ++i) {
