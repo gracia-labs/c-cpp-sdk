@@ -147,8 +147,9 @@ one; the SDK serves both, and it keys its pipeline cache on that handle. Either 
 
 32. The viewpoint, the pivot and the status of a `.grv` come with its head, after the open. Read the
     viewpoint and the pivot when the metadata lands (rule 17), as the box. Frame the camera about the
-    pivot, and start it at the `DISPLAY` viewpoint. In a headset, put the floor of the content under
-    the `VR` viewpoint onto the floor of the room, at full size.
+    pivot, and start it at the `DISPLAY` viewpoint. In a headset, put the eye of the `VR` viewpoint
+    where the head is at the first frame, upright, in its heading, at full size: a runtime can put the
+    origin of its space anywhere in the room (`placeAtViewpoint` of the XR example).
 33. Read `status()` only after `ready()` returns false: `ready()` reads the head. A status other than
     `OK` does not change. Destroy the stream, and open a `HEAD_HASH` video again with its head.
 34. A local `.grv` that holds a head hash takes the head in the file beside it, with `.head` after its

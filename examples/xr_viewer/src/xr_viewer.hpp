@@ -39,7 +39,7 @@ class XrViewer {
 
  private:
   bool rebuildRenderer();
-  void place(const std::optional<float>& floorY);
+  void place(const glm::mat4& head);
 
   SplatsPlayer player_;
   gracia::SdkSplatsRenderer renderer_;
@@ -47,7 +47,6 @@ class XrViewer {
   std::array<gracia::DrawCalls, XrContext::kFramesInFlight> frames_;
   bool checkedStereo_ = false;
   bool placed_ = false;
-  bool hasFloor_ = false;
   bool reportedProblem_ = false;
   float scale_ = 0.75f, distance_ = 0.5f, height_ = 0.5f;
   GraciaColorFormat color_ = GRACIA_COLOR_FORMAT_RGBA8_UNORM;

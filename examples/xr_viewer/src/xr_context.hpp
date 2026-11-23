@@ -35,8 +35,6 @@ struct XrFrameCtx {
   std::array<XrView, 2> views{};  // 0 = left, 1 = right (spec order)
   uint32_t acquiredCount = 0;
   VkExtent2D eyeExtent{};  // per eye, not the combined width
-  // The height of the floor in the reference space, once the runtime locates it.
-  std::optional<float> floorY;
 };
 
 // OpenXR session plus the Vulkan device it chose, and a color-only render pass
@@ -57,8 +55,6 @@ class XrContext {
   // Always matches the render pass attachment and the XR swapchain format.
   GraciaColorFormat colorFormat() const { return graciaColorFormat_; }
   const std::string& runtimeName() const { return runtimeName_; }
-  // The runtime has a STAGE space, thus a frame can give the height of the floor.
-  bool hasFloor() const { return stageSpace_ != XR_NULL_HANDLE; }
   void waitIdle() const {
     if (device_) vkDeviceWaitIdle(device_);
   }
@@ -93,7 +89,6 @@ class XrContext {
   XrSystemId systemId_ = XR_NULL_SYSTEM_ID;
   XrSession session_ = XR_NULL_HANDLE;
   XrSpace appSpace_ = XR_NULL_HANDLE;
-  XrSpace stageSpace_ = XR_NULL_HANDLE;  // only for the height of the floor
   XrSessionState state_ = XR_SESSION_STATE_UNKNOWN;
   bool sessionRunning_ = false;
   bool exitLoop_ = false;

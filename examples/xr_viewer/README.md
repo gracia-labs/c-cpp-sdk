@@ -13,10 +13,10 @@ Put the headset on, and the scene stands in front of you.
   call for each eye (multipass stereo).
 - **Head tracking** — the runtime supplies the pose and the projection of each
   eye. The scene is placed in front of the origin of the reference space.
-- **VR viewpoint** — a `.grv` that states a VR viewpoint plays at full size: you
-  stand on its floor under the viewpoint, and you look along its heading. The
-  height of the floor comes from the `STAGE` space of the runtime. A runtime with
-  no `STAGE` space gets the placement of other content.
+- **VR viewpoint** — a `.grv` that states a VR viewpoint plays at full size: at
+  the first frame your eyes go to the viewpoint, upright, in the heading of your
+  head, which keeps its tilt. The origin of the space of a runtime can lie
+  anywhere in the room, thus the placement starts from your head.
 - **Sound** — the SDK plays the sound of each `.grv` on the default playback
   device, with the listener at the head between the two eyes.
 - **Video playback** — the same clock as the desktop viewer. The video loops.

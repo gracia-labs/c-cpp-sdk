@@ -21,7 +21,6 @@ bool XrViewer::load(const XrContext& xr,
                     const std::string& streamUrl, const std::string& token,
                     const std::vector<uint8_t>& key) {
   color_ = xr.colorFormat();
-  hasFloor_ = xr.hasFloor();
   const bool ok = scenes.empty() ? player_.loadStream(streamUrl, token, key)
                                  : player_.loadScenes(scenes);
   return ok && rebuildRenderer();
@@ -69,18 +68,13 @@ void XrViewer::placeScene(float scaleMeters, float distanceMeters,
   placed_ = false;
 }
 
-void XrViewer::place(const std::optional<float>& floorY) {
+void XrViewer::place(const glm::mat4& head) {
   SceneGroup* group = player_.group();
   if (placed_ || !group) return;
   const BBox box = group->boundingBox();
   if (!box.valid()) return;  // a stream has no box until its metadata lands
   const auto viewpoint = group->viewpoint(GRACIA_VIEWPOINT_VR);
-  if (viewpoint && hasFloor_) {
-    if (!floorY) return;  // the runtime can locate its floor some frames late
-    group->setTransform(placeAtViewpoint(*viewpoint, *floorY));
-  } else {
-    group->setTransform(placeSceneForXr(box, scale_, distance_, height_));
-  }
+  group->setTransform(viewpoint ? placeAtViewpoint(*viewpoint, head) : placeSceneForXr(box, scale_, distance_, height_));
   placed_ = true;
 }
 
@@ -89,8 +83,9 @@ void XrViewer::prepare(const XrFrameCtx& f) {
   draws = {};
   SceneGroup* group = player_.group();
   if (!player_.hasScenes() || !renderer_) return;
-  place(f.floorY);
-  player_.setListener(xrHead(f.views[0].pose, f.views[1].pose));
+  const glm::mat4 head = xrHead(f.views[0].pose, f.views[1].pose);
+  place(head);
+  player_.setListener(head);
 
   glm::mat4 proj[2], cam[2];
   for (int i = 0; i < 2; ++i) {
