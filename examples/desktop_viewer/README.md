@@ -80,7 +80,7 @@ sets `ImGuiSliderFlags_NoRoundToFormat` and reads the drag state with
 
 ## Build
 
-From the SDK root (`public/c-cpp-sdk`):
+From the SDK root:
 
 ```sh
 cmake -S . -B build

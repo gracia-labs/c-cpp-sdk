@@ -22,7 +22,7 @@ struct Frame {
 // from gracia_demo.
 class VulkanContext {
  public:
-  // Matches the SDK's per-frame ring depth (fuji uses 3); stay at or below it and
+  // Matches the SDK's per-frame ring depth (3); stay at or below it and
   // submit every frame on the one queue the SDK tracks.
   static constexpr uint32_t kFramesInFlight = 3;
 

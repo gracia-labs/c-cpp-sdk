@@ -15,8 +15,7 @@ The SDK is a prebuilt binary in `artifacts/windows.zip`, `artifacts/android.zip`
 Windows, Android and Linux the SDK renders with Vulkan. The two examples run on Windows and Linux.
 
 Correct a playback defect in the player, not in the SDK. The SDK core and the video loader are shared
-with the Apple SDK and the Python SDK, and both are validated there. The Mac viewer
-(`public/apple-sdk/Sources/GraciaView/SplatsSceneView.swift`) is the reference player. The desktop
+with the Apple SDK and the Python SDK, and both are validated there. The Mac viewer in the Apple SDK (`Sources/GraciaView/SplatsSceneView.swift`) is the reference player. The desktop
 viewer is a port of it.
 
 Both examples link [`examples/common`](examples/common/), which holds the Vulkan device setup, the

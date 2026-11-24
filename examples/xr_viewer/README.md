@@ -30,7 +30,7 @@ and the pose and projection maths.
 
 ## Build
 
-From the SDK root (`public/c-cpp-sdk`):
+From the SDK root:
 
 ```sh
 cmake -S . -B build
