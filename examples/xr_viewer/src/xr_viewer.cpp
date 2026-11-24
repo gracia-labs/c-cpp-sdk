@@ -92,9 +92,9 @@ void XrViewer::prepare(const XrFrameCtx& f) {
     proj[i] = xrProjection(f.views[i].fov, kNearZ, kFarZ);
     cam[i] = xrPose(f.views[i].pose);  // camera-to-world; the SDK inverts it
   }
-  glm::mat4 loco(1.0f);
-  float* projections[2] = {glm::value_ptr(proj[0]), glm::value_ptr(proj[1])};
-  float* viewTransforms[2] = {glm::value_ptr(cam[0]), glm::value_ptr(cam[1])};
+  const glm::mat4 loco(1.0f);
+  const float* projections[2] = {glm::value_ptr(proj[0]), glm::value_ptr(proj[1])};
+  const float* viewTransforms[2] = {glm::value_ptr(cam[0]), glm::value_ptr(cam[1])};
 
   std::vector<Scene::RenderRef> objs;
   objs.reserve(group->size());
@@ -113,23 +113,23 @@ void XrViewer::prepare(const XrFrameCtx& f) {
   player_.setBuffering(draws.buffering);
 
   // One view back means stereo is off: a stable mono picture, and no error.
-  if (!checkedStereo_ && !draws.color.views.empty()) {
+  if (!checkedStereo_ && !draws.color.empty()) {
     checkedStereo_ = true;
-    if (draws.color.views.size() < XrContext::kEyes)
+    if (draws.color.size() < XrContext::kEyes)
       std::fprintf(stderr,
-                   "WARNING: the SDK returned %zu view(s), not 2. Stereo is off; "
+                   "WARNING: the SDK returned %u view(s), not 2. Stereo is off; "
                    "check the vr flag on both create() and render().\n",
-                   draws.color.views.size());
+                   draws.color.size());
   }
 }
 
 void XrViewer::record(uint32_t slot, uint32_t eye, VkCommandBuffer cmd) {
   auto& draws = frames_[slot];
   // Draw while buffering too: the SDK holds the last decoded frame.
-  if (eye >= draws.color.views.size() || !draws.color.views[eye].has_value()) return;
+  if (eye >= draws.color.size() || !draws.color[eye]) return;
 
   // renderPass stays null: the SDK then records with dynamic rendering.
   GraciaRenderPass rp{};
   rp.commandBuffer = cmd;
-  draws.color.views[eye]->execute(rp);
+  draws.color[eye].execute(rp);
 }

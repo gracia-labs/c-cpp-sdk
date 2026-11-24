@@ -157,10 +157,8 @@ void Scene::setFlag(const std::string& key, bool value) {
 }
 
 void Scene::setTransform(const glm::mat4& m) {
-  float cols[16];
-  std::copy_n(glm::value_ptr(m), 16, cols);
-  if (video_) vid().setTransform(cols);
-  else stat().setTransform(cols);
+  if (video_) vid().setTransform(glm::value_ptr(m));
+  else stat().setTransform(glm::value_ptr(m));
 }
 
 void Scene::setTime(double t) {

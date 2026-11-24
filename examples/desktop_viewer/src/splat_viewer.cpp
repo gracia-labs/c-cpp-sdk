@@ -132,18 +132,16 @@ void SplatViewer::prepare(const Frame& frame) {
 
   const GraciaRendererSplatsPass pass =
       makeSplatsPass(GRACIA_COLOR_FORMAT_RGBA8_UNORM, GRACIA_STEREO_MODE_MULTIPASS);
-  glm::mat4 proj = view.projection;
-  glm::mat4 cam = view.cameraToWorld;
-  glm::mat4 loco(1.0f);
-  float* projections[2] = {glm::value_ptr(proj), glm::value_ptr(proj)};
-  float* viewTransforms[2] = {glm::value_ptr(cam), glm::value_ptr(cam)};
+  const glm::mat4 loco(1.0f);
+  const float* projections[2] = {glm::value_ptr(view.projection), glm::value_ptr(view.projection)};
+  const float* viewTransforms[2] = {glm::value_ptr(view.cameraToWorld), glm::value_ptr(view.cameraToWorld)};
 
   // The SDK's compute prep goes into this frame's buffer, before the render
   // pass; vk_context barriers it before the draws replay.
   GraciaCommandBuffer gcb{};
   gcb.handle = frame.cmd;
   auto renderInto = [&](SceneRenderer& r,
-                        const std::vector<Scene::RenderRef>& objs) {
+                        std::span<const Scene::RenderRef> objs) {
     return r.splats.render(objs, projections, viewTransforms, glm::value_ptr(loco), w, h,
                            false, pass, nullptr, nullptr, gcb);
   };
@@ -156,8 +154,8 @@ void SplatViewer::prepare(const Frame& frame) {
     if (const auto follow = group->portalFollow()) camera_.follow(*follow);
   } else {
     for (size_t i = 0; i < n && i < scenes.size(); ++i) {
-      std::vector<Scene::RenderRef> objs{scenes[i]->renderRef()};
-      draws[i].splats = renderInto(renderers_[i], objs);
+      const Scene::RenderRef ref = scenes[i]->renderRef();
+      draws[i].splats = renderInto(renderers_[i], {&ref, 1});
     }
   }
 
@@ -167,18 +165,18 @@ void SplatViewer::prepare(const Frame& frame) {
     auto& dc = fd.splats;
     // Draw while buffering too: the SDK holds the last decoded frame, so the
     // picture freezes instead of blanking. `buffering` is HUD state, not a gate.
-    fd.haveColor = !dc.color.views.empty() && dc.color.views[0].has_value();
+    fd.haveColor = !dc.color.empty() && bool(dc.color[0]);
     anyBuffering = anyBuffering || dc.buffering;
 
     // Resolve the splat depth data into a color draw call executed in record().
-    if (depthAsColor_ && fd.haveColor && !dc.depth.views.empty() &&
-        dc.depth.views[0].has_value()) {
-      gracia::DrawCall* depthView = &dc.depth.views[0].value();
+    if (depthAsColor_ && fd.haveColor && !dc.depth.empty() && dc.depth[0]) {
+      gracia::DrawCall* depthView = &dc.depth[0];
       // Linearizing spreads over near/far, so fit the projection to the subject.
-      glm::mat4 resolveProj = depthLinear_ ? camera_.subjectProjection() : proj;
+      const glm::mat4 resolveProj = depthLinear_ ? camera_.subjectProjection() : view.projection;
+      const float* resolveProjPtr = glm::value_ptr(resolveProj);
       fd.resolve = renderers_[i].resolver.render(
-          {depthView}, dc.depth.stereo.value_or(GRACIA_STEREO_MODE_MULTIPASS),
-          w, h, {glm::value_ptr(resolveProj)},
+          std::span(&depthView, 1), dc.depth.stereo.value_or(GRACIA_STEREO_MODE_MULTIPASS),
+          w, h, std::span(&resolveProjPtr, 1),
           GRACIA_COLOR_FORMAT_RGBA8_UNORM, GRACIA_DEPTH_FORMAT_UNDEFINED, depthLinear_, gcb);
     }
   }
@@ -194,10 +192,10 @@ void SplatViewer::record(const Frame& frame, VkCommandBuffer cmd) {
     GraciaRenderPass rp{};
     rp.commandBuffer = cmd;
     auto& rc = draws[i].resolve.color;
-    if (depthAsColor_ && !rc.views.empty() && rc.views[0].has_value())
-      rc.views[0]->execute(rp);
+    if (depthAsColor_ && !rc.empty() && rc[0])
+      rc[0].execute(rp);
     else
-      draws[i].splats.color.views[0]->execute(rp);
+      draws[i].splats.color[0].execute(rp);
   };
 
   if (layout_ == SceneLayout::Mix) {

@@ -30,9 +30,10 @@ uint32_t keyMaskFor(int glfwKey) {
 
 void SceneCamera::setBBox(const BBox& full, const BBox& adaptive,
                           std::optional<glm::vec3> pivot, bool reposition) {
-  const GraciaBBox adapt = toGraciaBBox(adaptive);
-  const float p[3] = {pivot ? pivot->x : 0.0f, pivot ? pivot->y : 0.0f, pivot ? pivot->z : 0.0f};
-  cam_.setBBox(toGraciaBBox(full), adaptive.valid() ? &adapt : nullptr, pivot ? p : nullptr, reposition);
+  std::optional<std::array<float, 3>> p;
+  if (pivot) p = {pivot->x, pivot->y, pivot->z};
+  cam_.frame(toGraciaBBox(full), adaptive.valid() ? std::optional(toGraciaBBox(adaptive)) : std::nullopt,
+             p, reposition);
 }
 
 void SceneCamera::place(const glm::vec3& eye, const glm::quat& orientation) {
@@ -43,17 +44,13 @@ void SceneCamera::place(const glm::vec3& eye, const glm::quat& orientation) {
 
 void SceneCamera::follow(const glm::mat4& move) { cam_.follow(glm::value_ptr(move)); }
 
-void SceneCamera::zoom(float factor) {
-  if (factor > 0.0f) cam_.addZoom(std::log(factor));
-}
-
 RenderView SceneCamera::renderView(float aspect, float viewHeightPixels) {
-  const GraciaCameraView v = cam_.renderView(aspect, viewHeightPixels);
+  const GraciaCameraView v = cam_.view(aspect, viewHeightPixels);
   return {glm::make_mat4(v.projection), glm::make_mat4(v.cameraToWorld)};
 }
 
-glm::mat4 SceneCamera::subjectProjection() const {
-  return glm::make_mat4(cam_.subjectProjection().data());
+glm::mat4 SceneCamera::subjectProjection() {
+  return glm::make_mat4(cam_.view().subjectProjection);
 }
 
 void CameraInput::pointerDown(glm::vec2 p, bool secondary, bool option) {

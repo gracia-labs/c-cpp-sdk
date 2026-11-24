@@ -17,25 +17,31 @@ struct RenderView {
 // Trackball orbit + fly camera backed by `gracia::Camera` from SDK.hpp.
 class SceneCamera {
  public:
-  SceneCamera() : cam_(/*reverseZ=*/true, /*flipY=*/true) {}
+  SceneCamera() : cam_({60.0f, 1.0f, 1.0f, /*reverseZ=*/true, /*flipY=*/true}) {}
 
-  void setReverseZ(bool r) { cam_.setReverseZ(r); }
+  void setReverseZ(bool r) {
+    auto cfg = cam_.config();
+    cfg.reverseZ = r;
+    cam_.setConfig(cfg);
+  }
 
   void setBBox(const BBox& full, const BBox& adaptive,
                std::optional<glm::vec3> pivot, bool reposition = true);
   void place(const glm::vec3& eye, const glm::quat& orientation);
   void follow(const glm::mat4& move);
   void reset() { cam_.reset(); }
-  bool isFramed() const { return cam_.isFramed(); }
+  bool isFramed() { return cam_.view().framed; }
 
   bool update(float dt) { return cam_.update(dt); }
-  void zoom(float factor);
+  void zoom(float factor) { cam_.zoom(factor); }
   void setKeys(uint32_t mask) { cam_.setKeys(mask); }
-  void addRotation(float dx, float dy) { cam_.addRotation(dx, dy); }
-  void addPan(float dx, float dy) { cam_.addPan(dx, dy); }
-  void addScroll(float deltaY, bool precise) { cam_.addScroll(deltaY, precise); }
+  void addRotation(float dx, float dy) { cam_.input({.rotate = {dx, dy}}); }
+  void addPan(float dx, float dy) { cam_.input({.pan = {dx, dy}}); }
+  void addScroll(float deltaY, bool precise) {
+    cam_.input({.scroll = deltaY, .scrollPrecise = precise});
+  }
   RenderView renderView(float aspect, float viewHeightPixels);
-  glm::mat4 subjectProjection() const;
+  glm::mat4 subjectProjection();
 
  private:
   gracia::Camera cam_;
