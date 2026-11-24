@@ -3,12 +3,13 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 #include <openxr/openxr.h>
 
 #include <cmath>
 
-#include <gracia/SDK.h>
+#include <gracia/SDK.hpp>
 #include <gracia_demo/math3d.hpp>
 
 // Reverse-Z projection from an asymmetric XrFovf, in the layout
@@ -60,22 +61,11 @@ inline glm::mat4 xrHead(const XrPosef& left, const XrPosef& right) {
   return m;
 }
 
-// The upright frame of `pose`, camera to world: at its place, turned about +Y
-// to the heading of its view, which looks along -Z.
-inline glm::mat4 uprightOf(const glm::mat4& pose) {
-  glm::mat4 m = glm::rotate(glm::mat4(1.0f), std::atan2(pose[2].x, pose[2].z), glm::vec3(0, 1, 0));
-  m[3] = pose[3];
-  return m;
-}
-
 // A VR viewpoint at full size (GRACIA_VIEWPOINT_VR of SDK.h): the eye of the
 // pose goes where `head` is at the first frame, upright, in its heading. The
 // headset keeps its tilt, and a runtime can put the origin of its space anywhere.
 inline glm::mat4 placeAtViewpoint(const GraciaPose& pose, const glm::mat4& head) {
-  const float* r = pose.rotation;  // {x, y, z, w}
-  const glm::mat4 eye = glm::translate(glm::mat4(1.0f), glm::vec3(pose.position[0], pose.position[1], pose.position[2])) *
-                        glm::mat4_cast(glm::quat(r[3], r[0], r[1], r[2]));
-  return uprightOf(head) * glm::inverse(uprightOf(eye));
+  return glm::make_mat4(gracia::vrPlacement(pose, glm::value_ptr(head)).data());
 }
 
 // The user stands at the origin, so move the scene in front of them. Feed this

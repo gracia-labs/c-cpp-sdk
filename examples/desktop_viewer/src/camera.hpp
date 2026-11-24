@@ -3,8 +3,10 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
+#include <gracia/SDK.hpp>
 #include <gracia_demo/math3d.hpp>
 
+#include <cstdint>
 #include <optional>
 
 struct RenderView {
@@ -12,97 +14,31 @@ struct RenderView {
   glm::mat4 cameraToWorld{1.0f};
 };
 
-enum class MoveKey { W, A, S, D, R, F, Q, E, Shift };
-
-struct GestureDelta {
-  float rotX = 0, rotY = 0, panX = 0, panY = 0, zoom = 0;
-  bool settled() const;
-  GestureDelta& operator+=(const GestureDelta& r);
-  GestureDelta& operator-=(const GestureDelta& r);
-  GestureDelta operator*(float s) const;
-};
-
-// Accumulates raw input, drained on the render clock with critical damping (a
-// short inertial tail after release).
-class GestureInput {
- public:
-  float height = 1.0f;  // view height in pixels; normalizes drag feel
-  void addRotation(float dx, float dy);
-  void addPan(float dx, float dy);
-  void addZoom(float z);
-  void addScroll(float deltaY, bool precise);
-  void reset() { pending_ = {}; }
-  std::optional<GestureDelta> drain(float dt);
-
- private:
-  GestureDelta accumulated_{};
-  GestureDelta pending_{};
-};
-
-// Trackball orbit + fly camera with inertia, ported from the Apple SDK's
-// GraciaCamera. No world-up: rotation is about the camera's own axes, so it
-// rolls. Produces a camera-to-world transform and a reverse-Z Vulkan projection.
+// Trackball orbit + fly camera backed by `gracia::Camera` from SDK.hpp.
 class SceneCamera {
  public:
-  SceneCamera() { apply(); }
+  SceneCamera() : cam_(/*reverseZ=*/true, /*flipY=*/true) {}
 
-  void setReverseZ(bool r) { reverseZ_ = r; }
+  void setReverseZ(bool r) { cam_.setReverseZ(r); }
 
-  // `adaptive` is what the camera frames/zooms at (strays don't shrink scale);
-  // `full` bounds the far plane. `pivot` is the point the camera frames and turns
-  // about, as a .grv states it; with none, the centre of `adaptive`. An invalid box
-  // un-frames; reposition=false keeps the current pose (spawn).
   void setBBox(const BBox& full, const BBox& adaptive,
                std::optional<glm::vec3> pivot, bool reposition = true);
-  // Puts the camera at `eye` with a full orientation, roll included; reset()
-  // comes back to it. It reads nothing from the box.
   void place(const glm::vec3& eye, const glm::quat& orientation);
-  void reset();
-  bool isFramed() const { return framed_; }
+  void follow(const glm::mat4& move);
+  void reset() { cam_.reset(); }
+  bool isFramed() const { return cam_.isFramed(); }
 
-  bool update(float dt);          // advance inertia + keys; true if moved
-  void zoom(float factor);        // multiplicative; factor > 1 moves closer
-  void setKeys(unsigned mask) { keys_ = mask; }
+  bool update(float dt) { return cam_.update(dt); }
+  void zoom(float factor);
+  void setKeys(uint32_t mask) { cam_.setKeys(mask); }
+  void addRotation(float dx, float dy) { cam_.addRotation(dx, dy); }
+  void addPan(float dx, float dy) { cam_.addPan(dx, dy); }
+  void addScroll(float deltaY, bool precise) { cam_.addScroll(deltaY, precise); }
   RenderView renderView(float aspect, float viewHeightPixels);
-  // Projection with near/far tight to the subject, for linearized depth-as-color.
   glm::mat4 subjectProjection() const;
-  GestureInput& input() { return input_; }
 
  private:
-  glm::vec3 right() const { return orient_ * glm::vec3(1, 0, 0); }
-  glm::vec3 up() const { return orient_ * glm::vec3(0, 1, 0); }
-  glm::vec3 back() const { return orient_ * glm::vec3(0, 0, 1); }
-  bool flying() const;
-  float reach() const;
-  float flySpeed() const { return sceneRadius_ / 4.5f * flyTrim_; }
-
-  void frameScene(const BBox& full, const BBox& subject, const glm::vec3& centre,
-                  bool reposition);
-  void pose(const glm::vec3& eye, const glm::quat& orient);
-  void turn(float dx, float dy);
-  void dolly(float amount);
-  void pan(float px, float py);
-  bool move(float dt);
-  void apply();
-  void updateProjection();
-  glm::mat4 makeProjection(float near, float far) const;
-
-  glm::vec3 eye_{0};
-  glm::quat orient_{1, 0, 0, 0};
-  unsigned keys_ = 0;
-
-  glm::vec3 sceneCentre_{0};
-  float sceneRadius_ = 12.0f;
-  float fullRadius_ = 12.0f;
-  float flyTrim_ = 1.0f;
-  bool framed_ = false;
-  std::optional<std::pair<glm::vec3, glm::quat>> framing_;  // (eye, orientation)
-
-  float fov_ = 60.0f, aspect_ = 1.0f, near_ = 0.05f, far_ = 10000.0f;
-  bool reverseZ_ = true;
-  glm::mat4 projection_{1.0f};
-
-  GestureInput input_;
+  gracia::Camera cam_;
 };
 
 // Turns pointer / scroll / key events into camera motion. Pointer in pixels, y down.
@@ -124,5 +60,5 @@ class CameraInput {
   SceneCamera& cam_;
   std::optional<glm::vec2> lastPoint_;
   bool dragIsPan_ = false;
-  unsigned keys_ = 0;
+  uint32_t keys_ = 0;
 };

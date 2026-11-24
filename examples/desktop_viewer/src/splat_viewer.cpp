@@ -79,12 +79,10 @@ void SplatViewer::reframe() {
   if (!group) return;
   const BBox full = group->boundingBox();
   const auto pivot = group->pivot();
-  if (!full.valid()) {
-    camera_.setBBox(full, full, pivot, autoFrames_);
-    return;
-  }
-  const BBox subject = group->adaptiveBBox();
-  camera_.setBBox(full, subject.valid() ? subject : full, pivot, autoFrames_);
+  const auto portalBox = group->portalBBox();
+  const BBox adaptive = group->adaptiveBBox();
+  const BBox subject = portalBox ? *portalBox : (adaptive.valid() ? adaptive : full);
+  camera_.setBBox(full, subject, pivot, autoFrames_);
   const auto viewpoint = group->viewpoint(GRACIA_VIEWPOINT_DISPLAY);
   if (!autoFrames_ || !viewpoint) return;
   const float* p = viewpoint->position;
@@ -155,6 +153,7 @@ void SplatViewer::prepare(const Frame& frame) {
     objs.reserve(scenes.size());
     for (const auto& s : scenes) objs.push_back(s->renderRef());
     draws[0].splats = renderInto(renderers_[0], objs);
+    if (const auto follow = group->portalFollow()) camera_.follow(*follow);
   } else {
     for (size_t i = 0; i < n && i < scenes.size(); ++i) {
       std::vector<Scene::RenderRef> objs{scenes[i]->renderRef()};

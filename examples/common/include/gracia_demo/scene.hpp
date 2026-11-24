@@ -54,6 +54,8 @@ class Scene {
   // metadata lands, and none for other content.
   std::optional<GraciaPose> viewpoint(GraciaViewpoint display) const;
   std::optional<glm::vec3> pivot() const;
+  std::optional<BBox> portalBBox() const;
+  std::optional<glm::mat4> portalFollow() const;
   // Why a video plays nothing; read it after pump() returns false.
   GraciaVideoStatus status() const;
 
@@ -110,6 +112,8 @@ class SceneGroup {
   // The first that a scene states.
   std::optional<GraciaPose> viewpoint(GraciaViewpoint display) const;
   std::optional<glm::vec3> pivot() const;
+  std::optional<BBox> portalBBox() const;
+  std::optional<glm::mat4> portalFollow() const;
 
   void setTransform(const glm::mat4& m);
   void setTime(double t);

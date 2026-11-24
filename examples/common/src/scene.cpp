@@ -122,6 +122,21 @@ std::optional<glm::vec3> Scene::pivot() const {
   return glm::vec3((*p)[0], (*p)[1], (*p)[2]);
 }
 
+std::optional<BBox> Scene::portalBBox() const {
+  if (!video_) return std::nullopt;
+  const auto b = vid().portalBBox();
+  if (!b) return std::nullopt;
+  const BBox box = toBBox(*b);
+  return box.valid() ? std::optional(box) : std::nullopt;
+}
+
+std::optional<glm::mat4> Scene::portalFollow() const {
+  if (!video_) return std::nullopt;
+  const auto m = vid().portalFollow();
+  if (!m) return std::nullopt;
+  return glm::make_mat4(m->data());
+}
+
 GraciaVideoStatus Scene::status() const {
   return video_ ? vid().status() : GRACIA_VIDEO_STATUS_OK;
 }
@@ -232,6 +247,14 @@ std::optional<glm::vec3> SceneGroup::pivot() const {
   for (const auto& s : scenes_)
     if (auto p = s->pivot()) return p;
   return std::nullopt;
+}
+
+std::optional<BBox> SceneGroup::portalBBox() const {
+  return scenes_.size() == 1 ? scenes_[0]->portalBBox() : std::nullopt;
+}
+
+std::optional<glm::mat4> SceneGroup::portalFollow() const {
+  return scenes_.size() == 1 ? scenes_[0]->portalFollow() : std::nullopt;
 }
 
 void SceneGroup::setTransform(const glm::mat4& m) {
