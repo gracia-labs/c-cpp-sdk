@@ -242,9 +242,7 @@ std::optional<GraciaPose> SceneGroup::viewpoint(GraciaViewpoint display) const {
 }
 
 std::optional<glm::vec3> SceneGroup::pivot() const {
-  for (const auto& s : scenes_)
-    if (auto p = s->pivot()) return p;
-  return std::nullopt;
+  return scenes_.size() == 1 ? scenes_[0]->pivot() : std::nullopt;
 }
 
 std::optional<BBox> SceneGroup::portalBBox() const {

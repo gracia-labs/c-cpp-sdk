@@ -130,6 +130,7 @@ void onKey(GLFWwindow* w, int key, int, int action, int mods) {
   switch (key) {
     case GLFW_KEY_SPACE: a.viewer->player().togglePlay(); break;
     case GLFW_KEY_0: a.viewer->camera().reset(); break;
+    case GLFW_KEY_C: a.viewer->camera().setFreeLook(!a.viewer->camera().freeLook()); break;
     case GLFW_KEY_M: a.viewer->toggleLayout(); break;
     case GLFW_KEY_D: a.viewer->toggleDepthAsColor(); break;
     case GLFW_KEY_L: a.viewer->toggleDepthLinear(); break;
@@ -202,8 +203,20 @@ void drawMenuBar(SplatViewer& viewer, bool& openStream, bool& openFlag) {
       viewer.toggleDepthAsColor();
     if (ImGui::MenuItem("Linearize depth", "L", viewer.depthLinear(), viewer.depthAsColor()))
       viewer.toggleDepthLinear();
+    ImGui::Separator();
+    const bool freeLook = viewer.camera().freeLook();
+    if (ImGui::MenuItem("Orbit camera", "C", !freeLook))
+      viewer.camera().setFreeLook(false);
+    if (ImGui::MenuItem("Look camera", "C", freeLook))
+      viewer.camera().setFreeLook(true);
     ImGui::EndMenu();
   }
+  ImGui::Separator();
+  ImGui::TextDisabled("Camera:");
+  int camMode = viewer.camera().freeLook() ? 1 : 0;
+  ImGui::RadioButton("Orbit", &camMode, 0);
+  ImGui::RadioButton("Look", &camMode, 1);
+  viewer.camera().setFreeLook(camMode == 1);
   ImGui::EndMainMenuBar();
 }
 

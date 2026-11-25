@@ -25,6 +25,13 @@ class SceneCamera {
     cam_.setConfig(cfg);
   }
 
+  bool freeLook() const { return cam_.config().freeLook; }
+  void setFreeLook(bool on) {
+    auto cfg = cam_.config();
+    cfg.freeLook = on;
+    cam_.setConfig(cfg);
+  }
+
   void setBBox(const BBox& full, const BBox& adaptive,
                std::optional<glm::vec3> pivot, bool reposition = true);
   void place(const glm::vec3& eye, const glm::quat& orientation);
